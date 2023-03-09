@@ -1,3 +1,5 @@
 .env
 *.txt
-c*.csv
+.gitignore
+.vscode
+data
