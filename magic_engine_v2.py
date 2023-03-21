@@ -934,16 +934,10 @@ class OptionWizard:
                 worker=Thread(target=getattr(self, method_name),daemon=True)
                 worker.start()
         q.join()
-    def update_futures_data(self):
+    def update_futures_data(self,start_date=None,end_date=None):
         last_accessed_date_fut=self.last_accessed_date_fut
-    
-        # if pd.to_datetime(date.today()).date() == pd.to_datetime(last_accessed_date_fut).date():
-        #     print('Data is already updated')
-        #     return
-        
-        start=pd.to_datetime(last_accessed_date_fut).date()
-       
-        to_today=date.today()
+        start= start_date or pd.to_datetime(last_accessed_date_fut).date()
+        to_today=end_date or date.today()
         expiry_date=self.get_expiry(to_today.year,to_today.month)
         if(to_today>expiry_date):
             new_date=to_today+relativedelta(months=1)
@@ -957,13 +951,13 @@ class OptionWizard:
             q.put(input)
         self.start_threads('_update_futures_data')
         print('futures updated')
-        # self.activity.find_one_and_replace({'last_accessed_date':last_accessed_date_fut,'instrument':"fut"},{'instrument':"fut",'last_accessed_date':pd.to_datetime(date.today()-timedelta(days=0))})
+        self.activity.find_one_and_replace({'last_accessed_date':last_accessed_date_fut,'instrument':"fut"},{'instrument':"fut",'last_accessed_date':pd.to_datetime(date.today()-timedelta(days=0))})
     async def update_futures_data_v3(self):
         last_accessed_date_fut=date.today()
 
-        # if pd.to_datetime(date.today()).date() == pd.to_datetime(last_accessed_date_fut).date():
-        #     print('Data is already updated')
-        #     return
+        if pd.to_datetime(date.today()).date() == pd.to_datetime(last_accessed_date_fut).date():
+            print('Data is already updated')
+            return
         
         start=pd.to_datetime(last_accessed_date_fut).date()
         
@@ -984,22 +978,23 @@ class OptionWizard:
         return activity['last_accessed_date']
           
     def update_options_data(self,start_date,end_date):
-        # if pd.to_datetime(date.today()).date() == pd.to_datetime(self.last_accessed_date_opt).date():
-        #     print('Data is already updated')
-        #     return
+        if pd.to_datetime(start_date).date() == pd.to_datetime(self.last_accessed_date_opt).date():
+            print('Data is already updated')
+            return
         self.future_input_for_optionsV2(start_date,end_date,update_daily=True)
         self.start_threads('_download_historical_options')
         print('OPtions updated')
         self.activity.find_one_and_replace({'last_accessed_date':self.last_accessed_date_opt,'instrument':'opt'},{'instrument':'opt','last_accessed_date':pd.to_datetime(date.today())})
     #runs daily to update the  futures and options of the scripts
     def update_to_latest(self):
-        # self.update_futures_data()
-        # if len(self.skipped_futures)>0:
-        #     print('Could not update below tickers:\n')
-        #     print(self.skipped_futures)
-        #     return
-        print("--------------futures updated------------")
         start_date=pd.to_datetime(date.today())
+        self.update_futures_data()
+        if len(self.skipped_futures)>0:
+            print('Could not update below tickers:\n')
+            print(self.skipped_futures)
+            return    
+        print("--------------futures updated------------")
+     
         self.update_options_data(start_date=start_date,end_date=start_date)
         self. update_security_names()
         
@@ -1305,7 +1300,7 @@ option_wizard.update_to_latest()
 # end_month_date=pd.to_datetime(date.today())
 # days=(end_month_date-start_month_date).days
 # of_date=pd.to_datetime(date(2022,10,31))
-record = option_wizard.find_cheapest_options(n=15,input_date=datetime.today())
+record = option_wizard.find_cheapest_options(n=15)
 option_wizard.send_to_telegram(cheapest_records=record['cheapest_options'], today=record['day'])
 # option_wizard.place_orders(cheapest_records=record['cheapest_options'], trade_date=record['day'])
 
