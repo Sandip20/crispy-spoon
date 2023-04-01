@@ -649,6 +649,7 @@ class OptionWizard:
         elif day_name in exclusions:
             days=exclusions.index(day_name)+1
             today=today-timedelta(days=days)
+            print(today,today.strftime("%A"))
             print(days)
         query=[
                     {
