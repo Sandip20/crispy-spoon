@@ -4,6 +4,13 @@ we need to have mongodb instance running either it will be locally or on remote 
 install all the required packages to run this script 
 download strikes information: https://archives.nseindia.com/content/fo/sos_scheme.xls
 Download lots information: https://archives.nseindia.com/content/fo/fo_mktlots.csv
+Buying opportunity:
+Look for cheapeast as well as  wait for the move if
+first standard deviation jaise hi move aati hai we need to enter 
+first_standard_deviation =Volatility(IV) / 16.2
+for example stocks iv is around 30
+wait for 1.5% or 2% then buy and hold the stock
+
 
 todo:
 1) create UI to see the top n cheapest straddles
