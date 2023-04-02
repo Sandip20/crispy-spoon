@@ -54,7 +54,14 @@ class OptionWizard:
         return symbol_map.get(symbol, symbol)
     def connect_mongo(self):
         try:
-            self.client=MongoClient(f"mongodb://{os.environ['MONGO_INITDB_ROOT_USERNAME']}:{os.environ['MONGO_INITDB_ROOT_PASSWORD']}@localhost:27017/?retryWrites=true&w=majority")
+            if(os.environ['MONGO_INITDB_HOST']=="localhost"):
+                url=f"mongodb://{os.environ['MONGO_INITDB_ROOT_USERNAME']}:{os.environ['MONGO_INITDB_ROOT_PASSWORD']}@{os.environ['MONGO_INITDB_HOST']}:27017/?retryWrites=true&w=majority"
+                self.client=MongoClient(url)
+                print(url)
+            else:
+                
+                url=f"mongodb+srv://{os.environ['MONGO_INITDB_ROOT_USERNAME']}:{os.environ['MONGO_INITDB_ROOT_PASSWORD']}@{os.environ['MONGO_INITDB_HOST']}/?retryWrites=true&w=majority"
+                self.client=MongoClient(url,tlsCAFile=ca)
             db = self.client[f"{os.environ['MONGO_INITDB_DATABASE']}"]
             self.stock_options=db[f"{os.environ['STOCK_OPTION_COLLECTION_NAME']}"]
             self.stock_futures=db[f"{os.environ['STOCK_FUTURE_COLLECTION_NAME']}"]
