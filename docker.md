@@ -32,7 +32,7 @@ docker volume ls
 
 docker volume insptect mysql-db
 docker 
-
+docker cp 75f82bd7f272:/data/db C:\Users\sandip.pawar\Desktop\mongodb_data
 
 list the mounted data on the system 
 

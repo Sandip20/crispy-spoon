@@ -8,6 +8,7 @@ ADD install.sh /
 RUN /install.sh
 ENV PATH /root/miniconda3/bin:$PATH
 COPY options_wizard.ipynb options_wizard.ipynb
+COPY magic_engine_v2.py magic_engine_v2.py
 CMD ["ipython"]
 
 
