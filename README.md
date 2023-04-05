@@ -1,3 +1,16 @@
+Cookies that nse apis are depens on:
+bm_sv ,ak_bmsc
+target is to get these cookies and call the apis to get data
+
+
+
+
+
+
+
+
+
+
 requirements
 we need to have mongodb instance running either it will be locally or on remote server
 
