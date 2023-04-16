@@ -1,0 +1,23 @@
+# version: '3.9'
+# services:
+#   magic_engine:
+#     container_name: magic_engine
+#     image: magic-engine
+#     # build:
+#     #   context: .
+#     env_file:
+#       - .env
+
+#      # 
+
+version: "3"
+
+services:
+  jupyter:
+    image: continuumio/miniconda3
+    ports:
+      - "8888:8888"
+    command: >
+      /bin/bash -c "conda install jupyter -y --quiet &&
+      mkdir -p /opt/notebooks &&
+      jupyter notebook --notebook-dir=/opt/notebooks --ip='*' --port=8888 --no-browser --allow-root"
