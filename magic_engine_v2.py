@@ -96,7 +96,8 @@ class OptionWizard:
             print("Unable to connect to the server.",e)
     def telegram_bot(self,bot_message):
         send_text='https://api.telegram.org/bot'+self.tg_api_token+'/sendMessage?chat_id='+self.tg_chat_id+'&parse_mode=html&text='+bot_message
-        requests.get(send_text)
+        response=requests.get(send_text)
+        print(response.text)
     def update_stocks_info(self):
         # Define the file names and paths
         strike_info_path = os.path.join('files', os.environ['STRIKE_INFO_NAME'])
@@ -665,8 +666,9 @@ class OptionWizard:
         script_symbols = ', '.join(rec['symbol'] for rec in cheapest_records)
         bot_message += f"\n<b>Script symbols:</b> {script_symbols}"
 
+        print(bot_message)
         # Send message to telegram
-        self.telegram_bot(bot_message)
+        self.telegram_bot(bot_message.replace('&','_'))
    
 
     def find_cheapest_options(self,n,input_date=None,no_of_days_back=False):
