@@ -20,7 +20,7 @@ run this every quarter to keep updated files
 
 # option_wizard. get_month_fut_history('COFORGE',2022,11)
 # option_wizard.update_to_latest()
-option_wizard.update_to_latest_v3()
+# option_wizard.update_to_latest_v3()
 # start_date=pd.to_datetime(date(2023,3,15))#  this will include Feb month expiry  data
 # end_date=pd.to_datetime(date(2023,3,16))# this will include March month expiry data
 # option_wizard.download_historical_v3(start_date,end_date)
