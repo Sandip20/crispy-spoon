@@ -666,7 +666,6 @@ class OptionWizard:
         script_symbols = ', '.join(rec['symbol'] for rec in cheapest_records)
         bot_message += f"\n<b>Script symbols:</b> {script_symbols}"
 
-        print(bot_message)
         # Send message to telegram
         self.telegram_bot(bot_message.replace('&','_'))
    
@@ -1064,6 +1063,7 @@ class OptionWizard:
         end_time = time.time()
         execution_time = end_time - start_time
         print(f"Execution time: {execution_time} seconds")
+        self.activity.find_one_and_replace({'last_accessed_date':self.last_accessed_date_opt,'instrument':'fut'},{'instrument':'fut','last_accessed_date':pd.to_datetime(date.today())})
         print("--------------futures updated------------")
         start_time = time.time()
         start_date=pd.to_datetime(date.today())
@@ -1071,6 +1071,8 @@ class OptionWizard:
         end_time = time.time()
         execution_time = end_time - start_time
         print(f"Execution time: {execution_time} seconds")
+        # update the last accessed date of updates
+        self.activity.find_one_and_replace({'last_accessed_date':self.last_accessed_date_opt,'instrument':'opt'},{'instrument':'opt','last_accessed_date':pd.to_datetime(date.today())})
         self. update_security_names()
         self.add_ce_pe_of_same_dateV2(start_date=start_date,end_date=start_date)
         # print('data processing')

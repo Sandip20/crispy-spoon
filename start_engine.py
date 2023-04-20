@@ -20,7 +20,11 @@ run this every quarter to keep updated files
 
 # option_wizard. get_month_fut_history('COFORGE',2022,11)
 # option_wizard.update_to_latest()
-# option_wizard.update_to_latest_v3()
+option_wizard.update_to_latest_v3()
+
+record = option_wizard.find_cheapest_options(n=15)
+option_wizard.send_to_telegram(cheapest_records=record['cheapest_options'], today=record['day'])
+# option_wizard.place_orders(cheapest_records=record['cheapest_options'], trade_date=record['day'])
 # start_date=pd.to_datetime(date(2023,3,15))#  this will include Feb month expiry  data
 # end_date=pd.to_datetime(date(2023,3,16))# this will include March month expiry data
 # option_wizard.download_historical_v3(start_date,end_date)
@@ -35,9 +39,6 @@ run this every quarter to keep updated files
 # end_month_date=pd.to_datetime(date.today())
 # days=(end_month_date-start_month_date).days
 # of_date=pd.to_datetime(date(2022,10,31))
-record = option_wizard.find_cheapest_options(n=15)
-option_wizard.send_to_telegram(cheapest_records=record['cheapest_options'], today=record['day'])
-# option_wizard.place_orders(cheapest_records=record['cheapest_options'], trade_date=record['day'])
 
 # option_wizard.download_options_for_pnl(back_test=False)
 # portfolio = option_wizard.get_portfolio_pnl()
