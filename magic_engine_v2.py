@@ -12,7 +12,6 @@ from queue import Queue
 from threading import Thread
 from dotenv import load_dotenv
 from dateutil.relativedelta import relativedelta
-import matplotlib.pyplot as plt
 import asyncio
 from downloader.nse_india import NSE
 ca = certifi.where()
@@ -632,10 +631,7 @@ class OptionWizard:
     def send_to_telegram(self, cheapest_records, today):
     # Define column names and calculate maximum symbol length
         columns = ['Symbol', 'Strike', 'Straddle Premium', '%Coverage', 'Current vs prev two months']
-        # max_symbol_len = max(len(rec['symbol']) for rec in cheapest_records)
-        # today + timedelta(days=1)
         holidays=self.nse_india.get_nse_holidays()
-   
         def get_next_business_day(today, days=1):
             for i in range(1, days+1):
                 if (
