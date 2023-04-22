@@ -125,7 +125,6 @@ class OptionWizard:
         # Print the result
         print(f"Inserted {result.acknowledged} new records")
     def get_strike(self,price,step):
-        
         r=(price%step)
         if r < (step/2):
             if  isinstance(step,float):
@@ -154,10 +153,10 @@ class OptionWizard:
         expiry_next= self.get_expiry(year,month)
      
         #get historical contract of passed year and month
-        return get_history(
+        return self.nse_india.get_history(
             symbol=ticker,
-            start=prev_expiry,
-            end=expiry_next,
+            from_date=prev_expiry,
+            to_date=expiry_next,
             futures=True,
             expiry_date=expiry_next
             )
@@ -191,6 +190,7 @@ class OptionWizard:
             if is_exist is None:
                 self.stock_options.insert_one(record[0])
             q.task_done()
+            
     async def _download_historical_options_v3(self,symbol,s_date,end_date,strike_price,fut_close,type):
         try:
             print(f'{symbol} is processing')
@@ -202,41 +202,6 @@ class OptionWizard:
             self.stock_options.insert_many(self.data_frame_to_dict(opt_data))
         except Exception as e:
             print(f"Error downloading Options data for {symbol} option Type:{type}: {e}")
-                
-    def _download_historical_futures(self):
-        global q
-       
-        while q.qsize()!=0:
-            input_dict=q.get()
-            ticker=input_dict['ticker']
-            year=input_dict['year']
-            month=input_dict['month']
-            print(f'{ticker} is processing ')
-            ohlc_fut=self.get_month_fut_history(ticker,year,month)
-            data=self.data_frame_to_dict(ohlc_fut)
-         
-            if (not ohlc_fut.empty) and ((data[0]['Symbol'] in  self.df_dict.keys()) or  ticker==self.map_symbol_name(data[0]['Symbol'])) :
-             
-                self.stock_futures.insert_many(data)
-            else:
-                input={}
-                input['ticker']=ticker
-                input['year']=year
-                input['month']=month
-                input['new_symbol']=data[0]['Symbol']
-                
-                document=self.skipped_futures_collection.find_one(
-                    {
-                        'ticker':input['ticker'],
-                        'year':input['year'],
-                        'month':input['month']
-                    })
-                if document is None:
-                    self.skipped_futures_collection.insert_one(input)
-                self.skipped_futures.append(input['ticker'])
-            
-            
-            q.task_done()
     async def _download_historical_futures_v3(self,ticker,year,month,):
           try:
             print(f'{ticker} is processing ')
@@ -247,32 +212,6 @@ class OptionWizard:
           except Exception as e:
             print(f"Error downloading Futures data for {ticker}: {e}")
 
-    def download_historical_futures_v2(self,start_date,end_date):
-        _month=start_date.month
-        _year=start_date.year
-        tickers=self.tickers
-       
-        for ticker in tickers:
-            if(self.map_symbol_name(ticker) is not None):
-                ticker=self.map_symbol_name(ticker)
-            no_of_months=(relativedelta(end_date,start_date).months+1)
-            month=_month
-            year=_year
-            while no_of_months>0 :
-                input_dict={
-                    "ticker":ticker ,
-                    "year":year,
-                    "month":month
-                    }
-                q.put(input_dict)
-                month+=1
-                if month%13==0:
-                    month=1
-                    year+=1
-                no_of_months-=1
-        print('Threads are starting')
-        self.start_threads('_download_historical_futures')
-        print('download completed') 
     async def download_historical_futures_v3(self,start_date,end_date):
         _month=start_date.month
         _year=start_date.year
@@ -295,7 +234,8 @@ class OptionWizard:
                     year+=1
                 no_of_months-=1
         await asyncio.gather(*tasks)
-        print('download completed') 
+        print('download completed')
+ 
     def future_input_for_optionsV2(self, start_date, end_date, update_daily=False):
         ohlc_futures = []
         if update_daily:
@@ -346,81 +286,6 @@ class OptionWizard:
             input_dict_copy=input_dict.copy()
             input_dict_copy['type']="PE"
             q.put(input_dict_copy)
-    def future_input_for_options(self,start_date=None,end_date=None,update_daily=False):
-        ohlc_futures=[]
-        if(update_daily):
-            last_accessed_date_opt=self.last_accessed_date_opt
-            stock_futures_cursor=self.stock_futures.find(
-                {
-                    "Date":{
-                        "$gte": pd.to_datetime(last_accessed_date_opt)
-                        }
-                    },
-                {"_id":0,"Symbol":1,"Expiry":1,"Close":1,"Date":1
-                }
-                )
-            ohlc_futures.extend(list(stock_futures_cursor))
-        else:
-            prev_month=start_date.month-1
-            year=start_date.year
-            if(prev_month==0):
-                prev_month=12
-                prev_expiry= self.get_expiry(year-1,prev_month)
-            else:
-                prev_expiry= self.get_expiry(year,prev_month)
-        
-            # add one day to make it as start of the contract for  current month
-            prev_expiry=prev_expiry+timedelta(days=1)
-            # get current month expiry date for  
-            expiry_next= self.get_expiry(end_date.year,end_date.month)
-            # expiry_dates=list(self.stock_futures.distinct('Expiry'))
-            ohlc_futures= list(self.stock_futures.find(
-                {'Date':{
-                    "$gte":pd.to_datetime(prev_expiry),
-                    "$lte":pd.to_datetime(expiry_next)
-                    }
-                 },
-                {"_id":0,"Symbol":1,"Expiry":1,"Close":1,"Date":1}))
-           
-            # for expiry in expiry_dates:
-            #     stock_futures_cursor=self.stock_futures.find({'Expiry':expiry},{"_id":0,"Symbol":1,"Expiry":1,"Close":1,"Date":1})
-            #     ohlc_futures.extend(list(stock_futures_cursor)) 
- 
-        step_dict=self.df_dict
-        already_exists=[]
-        for ohlc_fut in ohlc_futures:
-            symbol=ohlc_fut["Symbol"]
-            if(symbol=="LTI"):
-                symbol="LTIM"
-            
-            options_data=list(self.stock_options.find({"Symbol":symbol,"Date":ohlc_fut['Date']}))
-            if(len(options_data)==2):
-                already_exists.append({"symbol":symbol,"date":ohlc_fut['Date']})
-                continue
-            if symbol not in self.tickers:
-                continue    
-            step=step_dict[symbol]
-                        
-            end_date=ohlc_fut["Expiry"]
-            #all dates of current month
-            # get step of the sticker 
-            s_date=ohlc_fut['Date']
-            close=ohlc_fut["Close"]
-            strike_price=self.get_strike(close,step)
-            input_dict={
-                "end_date":end_date,
-                "symbol":self.map_symbol_name(symbol),
-                "s_date":s_date,
-                "close":close,
-                "strike_price":strike_price,
-                "fut_close":ohlc_fut['Close'],
-                "type":"CE"
-            }
-            q.put(input_dict)
-            input_dict_copy=input_dict.copy()
-            input_dict_copy['type']="PE"
-            q.put(input_dict_copy)
-        print(f"skipped scripts{already_exists}")
     def add_ce_pe_of_same_dateV2(self, start_date, end_date):
         pipeline = [
            {
@@ -512,11 +377,6 @@ class OptionWizard:
         if aggregated:
             self.processed_options_data.insert_many(aggregated)
         print("Processed successfully")
-    def download_historical_options(self,start_date,end_date,delete_old=False):
-            if delete_old:
-                self.stock_options.delete_many({})
-            self.future_input_for_optionsV2(start_date=start_date,end_date=end_date)
-            self.start_threads('_download_historical_options')
 
     async def download_historical_options_v3(self,start_date,end_date,update_daily=True):
         self.request_count=2
@@ -659,8 +519,8 @@ class OptionWizard:
             bot_message += f"<code>{row}</code>\n"
 
         # Format footer with script symbols
-        script_symbols = ', '.join(rec['symbol'] for rec in cheapest_records)
-        bot_message += f"\n<b>Script symbols:</b> {script_symbols}"
+        script_symbols = '1!, '.join(rec['symbol'] for rec in cheapest_records)
+        bot_message += f"\n<b>Script symbols:</b> <code> {script_symbols}1! </code> \n"
 
         # Send message to telegram
         self.telegram_bot(bot_message.replace('&','_'))
@@ -972,25 +832,6 @@ class OptionWizard:
                 worker=Thread(target=getattr(self, method_name),daemon=True)
                 worker.start()
         q.join()
-    def update_futures_data(self,start_date=None,end_date=None):
-        last_accessed_date_fut=self.last_accessed_date_fut
-        start= start_date or pd.to_datetime(last_accessed_date_fut).date()
-        to_today=end_date or date.today()
-        expiry_date=self.get_expiry(to_today.year,to_today.month)
-        
-        if(to_today>expiry_date):
-            new_date=to_today+relativedelta(months=1)
-            expiry_date=self.get_expiry(new_date.year,new_date.month)
-        for ticker in self.tickers:
-            input={}
-            input['ticker']=self.map_symbol_name(ticker)
-            input['start']=start
-            input['end']=to_today
-            input['expiry_date']= expiry_date
-            q.put(input)
-        self.start_threads('_update_futures_data')
-        print('futures updated')
-        self.activity.find_one_and_replace({'last_accessed_date':last_accessed_date_fut,'instrument':"fut"},{'instrument':"fut",'last_accessed_date':pd.to_datetime(date.today()-timedelta(days=0))})
     async def update_futures_data_v3(self):
         last_accessed_date_fut=self.last_accessed_date_fut
         self.request_count=1
@@ -1023,35 +864,7 @@ class OptionWizard:
         activity=self.activity.find_one({'instrument':instrument})
         return activity['last_accessed_date']
           
-    def update_options_data(self,start_date,end_date):
-        if pd.to_datetime(start_date).date() == pd.to_datetime(self.last_accessed_date_opt).date():
-            print('Data is already updated')
-            return
-        self.future_input_for_optionsV2(self.last_accessed_date_opt,end_date,update_daily=True)
-        self.start_threads('_download_historical_options')
-        print('OPtions updated')
-        self.activity.find_one_and_replace({'last_accessed_date':self.last_accessed_date_opt,'instrument':'opt'},{'instrument':'opt','last_accessed_date':pd.to_datetime(date.today())})
-    #runs daily to update the  futures and options of the scripts
-    def update_to_latest(self):
-        start_date=pd.to_datetime(date.today())
-        self.update_futures_data()
-        if len(self.skipped_futures)>0:
-            print('Could not update below tickers:\n')
-            print(self.skipped_futures)
-            return    
-        print("--------------futures updated------------")
-     
-        self.update_options_data(start_date=start_date,end_date=start_date)
-        print("--------------options  updated------------")
-        self. update_security_names()
-        
-        
-        self.add_ce_pe_of_same_dateV2(start_date=start_date,end_date=start_date)
-   
-        print('data processing')
-        # self.update_week_min_coverage()
-        self.update_current_vs_prev_two_months(today=True).to_csv('current.csv')
-        print('CSV generated')
+   #runs daily to update the  futures and options of the scripts
     def update_to_latest_v3(self):
         start_time = time.time()
         asyncio.run(self.update_futures_data_v3()) 
@@ -1076,13 +889,7 @@ class OptionWizard:
         self.update_current_vs_prev_two_months(today=True).to_csv('current.csv')
         print('CSV generated')
     
-    # download the historical of all the scripts   till date          
-    def download_historical(self,start_date,end_date):
-        start_time = time.time()
-        self.download_historical_futures_v2(start_date,end_date)
-        end_time = time.time()
-        execution_time = end_time - start_time
-        print(f"Execution time: {execution_time} seconds")
+    # download the historical of all the scripts   till date
     
     def download_historical_v3(self,start_date,end_date):
         start_time = time.time()
@@ -1102,6 +909,7 @@ class OptionWizard:
         self.add_ce_pe_of_same_dateV2(start_date=start_date,end_date=end_date)
         self.update_week_min_coverage(start_date=start_date,end_date=end_date)
         self.update_current_vs_prev_two_months(start_date=start_date,end_date=end_date)
+        
     def update_security_names(self):
         try:
             self.stock_futures.update_many({'Symbol':'LTI'},{'$set':{'Symbol':'LTIM'}})
