@@ -19,7 +19,6 @@ run this every quarter to keep updated files
 
 
 # option_wizard. get_month_fut_history('COFORGE',2022,11)
-# option_wizard.update_to_latest()
 option_wizard.update_to_latest_v3()
 
 record = option_wizard.find_cheapest_options(n=15)
