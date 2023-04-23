@@ -13,7 +13,7 @@ from threading import Thread
 from dotenv import load_dotenv
 from dateutil.relativedelta import relativedelta
 import asyncio
-from downloader.nse_india import NSE
+from src.nse_india import NSE
 ca = certifi.where()
 load_dotenv()
 NUM_THREADS = 7
@@ -97,6 +97,7 @@ class OptionWizard:
         send_text='https://api.telegram.org/bot'+self.tg_api_token+'/sendMessage?chat_id='+self.tg_chat_id+'&parse_mode=html&text='+bot_message
         response=requests.get(send_text)
         print(response.text)
+        
     def update_stocks_info(self):
         # Define the file names and paths
         strike_info_path = os.path.join('files', os.environ['STRIKE_INFO_NAME'])
@@ -169,27 +170,6 @@ class OptionWizard:
         option_type=opt_type,
         strike_price=strike,
         )
-    
-    def _download_historical_options(self):
-        global q
-        while q.qsize()!=0:
-            input_dict=q.get()
-            symbol=input_dict['symbol']
-            s_date=input_dict['s_date']
-            end_date=input_dict['end_date']
-            strike_price=input_dict['strike_price']
-            fut_close=input_dict["fut_close"]
-            type=input_dict['type']
-            print(f'{symbol} is processing')
-            opt_data=self.get_oneday_options_history(symbol,type,s_date,end_date,strike_price)
-            opt_data['days_to_expiry']=(end_date-s_date).days
-            opt_data['fut_close']=fut_close
-            opt_data['weeks_to_expiry']=opt_data['days_to_expiry'].apply(self.get_week)
-            record=self.data_frame_to_dict(opt_data)
-            is_exist=self.stock_options.find_one(record[0])
-            if is_exist is None:
-                self.stock_options.insert_one(record[0])
-            q.task_done()
             
     async def _download_historical_options_v3(self,symbol,s_date,end_date,strike_price,fut_close,type):
         try:
@@ -768,43 +748,7 @@ class OptionWizard:
         df_final.to_csv(f"./data/{'current_month'}.csv")
         df.to_csv(f"./data/consolidated.csv")
         print('csv generated')
-    
-    def _update_futures_data(self):
-        global q
-        while q.qsize()!=0:
-            input=q.get()
-            # if 'start'in input.keys() and input['start'] is not None:
-            start=input['start']
-            ticker=input['ticker']
-            end=input['end']
-            expiry_date=input['expiry_date']
-            print(f'{ticker} is processing')
-            ohlc_fut=self.nse_india.get_history(
-                symbol=ticker,
-                from_date=start,
-                to_date=end,
-                expiry_date=expiry_date
-            )
-            ohlc_fut= ohlc_fut.dropna()
-            if not ohlc_fut.empty:
-                data=self.data_frame_to_dict(ohlc_fut)
-                print(data[0]['Symbol'])
-                self.stock_futures.insert_many(data)
-            else:
-                input['start']=pd.to_datetime(input['start'])
-                input['end']=pd.to_datetime(input['end'])
-                input['expiry_date']=pd.to_datetime(input['expiry_date'])
-                document=self.skipped_futures_collection.find_one(
-                    {
-                        'ticker':input['ticker'],
-                        'start':input['start'],
-                        'expiry_date':input['expiry_date']
-                    })
-                if document is None:
-                    self.skipped_futures_collection.insert_one(input)
-                self.skipped_futures.append(input['ticker'])
-            q.task_done()
-    
+
     async def _update_futures_data_v3(self,ticker,start,end,expiry_date):
         try:
             print(f'{ticker} is processing')
