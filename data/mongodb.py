@@ -1,6 +1,7 @@
 # pylint: disable=redefined-builtin
 """
-This module contains a Python class named Mongo that provides a wrapper around the pymongo library for connecting to a MongoDB instance and performing database operations.
+This module contains a Python class named Mongo that provides a wrapper around the pymongo library
+for connecting to a MongoDB instance and performing database operations.
 
 Example usage:
 
