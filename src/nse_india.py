@@ -35,7 +35,7 @@ class NSE:
         self.session.mount('https://', adapter)
         self.request_count=1
 
-    def get_history(self, symbol, from_date, to_date, expiry_date,option_type='NA',strike_price="0.00"):
+    def get_history(self,symbol:str, from_date:datetime,to_date:datetime,expiry_date:datetime,option_type='NA',strike_price="0.00"):
         """
         symbol: Nse Symbol
         from_date:datetime
