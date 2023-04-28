@@ -1,7 +1,10 @@
 """
 Utility Module 
 """
+from datetime import timedelta
 import pandas as pd
+
+from data.constants import DATE_FORMAT_B
 
 def data_frame_to_dict(data_frame):
     """
@@ -23,6 +26,20 @@ def data_frame_to_dict(data_frame):
     data_frame['Expiry'] = pd.to_datetime(data_frame['Expiry'])
     return data_frame.to_dict('records')
 
+def get_next_business_day(today,holidays,exclusions, days=1):
+    """
+    Args:
+    holidays:List Nse holidays
+    exclusions:List exclusions of the days
+    days:int total days of bussiness
+    Returns:
+    Bussiness Day in format '%d-%b-%Y' 
+    """
+    for i in range(1, days+1):
+        if (
+            ((today + timedelta(days=i)).strftime(DATE_FORMAT_B) not in [h['tradingDate'] for h in holidays])
+            and ((today + timedelta(days=i)).strftime('%A') not in exclusions)):
+                return (today + timedelta(days=i)).strftime(DATE_FORMAT_B)
 
 def map_symbol_name(symbol):
     """

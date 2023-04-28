@@ -83,6 +83,7 @@ class NSEDownloader:
             expiry_date=current_month_expiry
         )
         return history
+    
     async def _download_historical_futures_v3(self, ticker: str, year: int,
                                               month: int) -> pd.DataFrame:
         """
@@ -177,3 +178,32 @@ class NSEDownloader:
             # self.stock_options.insert_many(self.data_frame_to_dict(opt_data))
         except requests.exceptions.RequestException as error:
             print(f"Error downloading Options data for {symbol} option Type:{type}: {error}")
+
+    async def _update_futures_data_v3(self,ticker:str,start:datetime,end:datetime,expiry_date:datetime) ->pd.DataFrame :
+        """
+        Download historical futures data for a given ticker.
+
+        Args:
+            ticker (str): The ticker for which to download the options data.
+            s_date (datetime): The start date of the options data.
+            end_date (datetime): The end date of the options data.
+            expiry_date (datetime): expiry date of the future .
+
+        Returns:
+            pd.DataFrame: A pandas DataFrame containing the historical options data.
+
+        Raises:
+            requests.exceptions.RequestException: If an error occurs while downloading the data.
+        """
+        try:
+            print(f'{ticker} is processing')
+            ohlc_fut =await asyncio.get_event_loop().run_in_executor(None,
+            self.nse_india.get_history,
+            ticker,
+            start,
+            end,
+            expiry_date)
+            ohlc_fut= ohlc_fut.dropna()
+            return ohlc_fut
+        except requests.exceptions.RequestException as error:
+                print(f"Error downloading futures data for {ticker} option Type:{type}: {error}")
