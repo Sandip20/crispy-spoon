@@ -36,7 +36,7 @@ class NSEDownloader:
     def close_connection(self):
         self.nse_india.session.close()
                
-    def get_expiry(self, year:int, month:int):
+    def get_expiry(self, year:int, month:int)->datetime.date:
         """Get the expiry date of a contract for the specified year and month.
 
         Args:

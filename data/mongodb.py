@@ -38,7 +38,11 @@ Example usage:
     filter = {'name': 'John Doe'}
     mongo.delete_one(filter)
 """
+from datetime import date,datetime
 from typing import Dict, Any,List
+from dateutil.relativedelta import relativedelta
+
+import pandas as pd
 from pymongo import MongoClient
 import certifi
 ca = certifi.where()
@@ -53,6 +57,8 @@ class Mongo:
         db (str): A string that represents the name of the database.
     """
 
+    
+    
     def __init__(self, url: str, db_name: str,is_ca_required:bool=False) -> None:
         """
         Initializes a new instance of the Mongo class.
@@ -145,3 +151,61 @@ class Mongo:
         """
         collection=self.client[collection]
         collection.delete_one(filter)
+
+    def aggregate(self,query:Dict[str, Any],collection:str)->List[Dict[str, Any]]:
+        """
+        Args:
+        query:Dict[str, Any]
+        collection:str
+
+        Returns:
+        List[Dict[str, Any]]
+        """
+        collection=self.client[collection]
+        return list(collection.aggregate(filter))
+
+    def bulk_write(self,bulk_operations,collection:str):
+        """
+        Args:
+        bulk_operations:[]
+        collection:str
+
+        Returns:
+        results
+
+        """
+        collection=self.client[collection]
+        return self.collection.bulk_write(bulk_operations)
+
+        
+    
+    # def get_current_month_data(self,current_expiry:date):
+
+    #     """
+    #     Args:
+    #     current_expiry:date
+        
+    #     Returns:
+    #     pd.DataFrame of current month data
+
+    #     """
+    #     return pd.DataFrame(self.find_many({
+    #         "Expiry":pd.to_datetime(current_expiry)
+    #     },'processed_options_data'))
+    
+    # def get_last_two_months_data(self,prev_one_month_expiry:datetime.date,prev_second_month_expiry:datetime.date):
+        
+    #     # today=today
+    #     # new_date=today-relativedelta(months=1)
+        
+    #     # prev_one_month_expiry=self.get_expiry(new_date.year,new_date.month)
+        
+    #     # new_date=today-relativedelta(months=3)
+        
+    #     # prev_second_month_expiry=self.get_expiry(new_date.year,new_date.month)
+        
+    #     return pd.DataFrame(self.find_many({
+    #     "Expiry":{
+    #         "$lte":pd.to_datetime(prev_one_month_expiry),"$gt":pd.to_datetime(prev_second_month_expiry),
+    #     }
+    # })))

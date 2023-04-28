@@ -1,10 +1,13 @@
 # pylint: disable=broad-exception-caught
 # https://www.youtube.com/watch?v=dJPLfWXHupE&ab_channel=TradeViaPython
-import requests
-import pandas as pd
+import os
 import time
 from datetime import date,datetime
-import os
+import requests
+
+import pandas as pd
+
+
 pd.set_option('display.max_rows', 1000)
 pd.set_option('display.max_columns', 1000)
 pd.set_option('display.width', 5000)
