@@ -128,7 +128,7 @@ class NSE:
             return None
 
  
-    def get_expiry_date(self,year: int, month: int):
+    def get_expiry_date(self,year: int, month: int,day:int=1):
 
         """Get the expiry date of a futures contract for the specified year and month.
 
@@ -144,7 +144,7 @@ class NSE:
             Exception: If the expiry date cannot be retrieved from the NSE website.
         """
         symbol = 'TATAMOTORS'
-        from_date=date(year,month,1).strftime(DATE_FORMAT)
+        from_date=date(year,month,day).strftime(DATE_FORMAT)
         to_date=date.today().strftime(DATE_FORMAT)
          
         url=f'{NSE_HOST}/api/historical/fo/derivatives/meta?from={from_date}&to={to_date}&instrumentType=FUTSTK&symbol={symbol}'
@@ -152,7 +152,16 @@ class NSE:
             response = self.session.get(url, headers=self.headers)
             response.raise_for_status()
             json_data = response.json()
-            date_string = json_data['years'][to_date.split('-')[2]][0]
+
+            for exp_date in  json_data['years'][to_date.split('-')[2]]:
+                if  datetime.strptime(exp_date, DATE_FORMAT_B).date() <= datetime.strptime(from_date, DATE_FORMAT).date():
+                    continue
+                date_string=exp_date
+                break
+
+
+
+            # date_string = json_data['years'][to_date.split('-')[2]][0]
             return datetime.strptime(date_string, DATE_FORMAT_B).date()
 
         except (requests.exceptions.HTTPError, KeyError, IndexError, ValueError) as e:

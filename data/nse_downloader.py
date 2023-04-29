@@ -36,7 +36,7 @@ class NSEDownloader:
     def close_connection(self):
         self.nse_india.session.close()
                
-    def get_expiry(self, year:int, month:int)->datetime.date:
+    def get_expiry(self, year:int, month:int,day:int=1)->datetime.date:
         """Get the expiry date of a contract for the specified year and month.
 
         Args:
@@ -47,7 +47,7 @@ class NSEDownloader:
             datetime.date: The expiry date of the contract for the specified year and month.
 
         """
-        return self.nse_india.get_expiry_date(year, month)
+        return self.nse_india.get_expiry_date(year, month,day)
     
     def get_month_fut_history(self, ticker: str, year: int, month: int) -> pd.DataFrame:
         """Get the historical contract for the specified ticker, year, and month.

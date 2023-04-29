@@ -81,7 +81,7 @@ class Mongo:
         Args:
             data (Dict[str, Any]): A dictionary that represents the data to be inserted.
         """
-        collection= self.client[collection]
+        collection= self.db[collection]
         collection.insert_one(data)
 
     def insert_many(self, data: Dict[str, Any],collection:str) -> None:
@@ -91,7 +91,7 @@ class Mongo:
         Args:
             data (List[Dict[str, Any]]): A list of dictionaries that represent the data to be inserted.
         """
-        collection=self.client[collection]
+        collection= self.db[collection]
         collection.insert_many(data)
 
     def find_one(self, filter: Dict[str, Any],collection:str) -> Dict[str, Any]:
@@ -104,7 +104,7 @@ class Mongo:
         Returns:
             Dict[str, Any]: A dictionary that represents the matching document, or None if no documents match.
         """
-        collection=self.client[collection]
+        collection=self.db[collection]
         return collection.find_one(filter)
 
     def find_many(self, filter: Dict[str, Any],collection:str) -> List[Dict[str, Any]]:
@@ -117,7 +117,7 @@ class Mongo:
         Returns:
             List[Dict[str, Any]]: A list of dictionaries that represent the matching documents, or an empty list if no documents match.
         """
-        collection=self.client[collection]
+        collection= self.db[collection]
         return list(collection.find(filter))
 
     def update_one(self, filter: Dict[str, Any], update: Dict[str, Any],collection:str) -> None:
@@ -128,7 +128,7 @@ class Mongo:
             filter (Dict[str, Any]): A dictionary that represents the filter criteria.
             update (Dict[str, Any]): A dictionary that represents the update criteria.
         """
-        collection=self.client[collection]
+        collection= self.db[collection]
         collection.update_one(filter, {"$set": update})
 
     def update_many(self, filter: Dict[str, Any], update: Dict[str, Any],collection:str) -> None:
@@ -139,7 +139,7 @@ class Mongo:
             filter (Dict[str, Any]): A dictionary that represents the filter criteria.
             update (Dict[str, Any]): A dictionary that represents the update criteria.
         """
-        collection=self.client[collection]
+        collection= self.db[collection]
         collection.update_many(filter, {"$set": update})
 
     def delete_one(self, filter: Dict[str, Any],collection) -> None:
@@ -149,7 +149,7 @@ class Mongo:
         Args:
             filter (Dict[str, Any]): A dictionary that represents the filter criteria.
         """
-        collection=self.client[collection]
+        collection= self.db[collection]
         collection.delete_one(filter)
 
     def delete_many(self, filter: Dict[str, Any],collection) -> None:
@@ -159,7 +159,7 @@ class Mongo:
         Args:
             filter (Dict[str, Any]): A dictionary that represents the filter criteria.
         """
-        collection=self.client[collection]
+        collection= self.db[collection]
         collection.delete_many(filter)
 
     def aggregate(self,query:Dict[str, Any],collection:str)->List[Dict[str, Any]]:
@@ -171,8 +171,8 @@ class Mongo:
         Returns:
         List[Dict[str, Any]]
         """
-        collection=self.client[collection]
-        return list(collection.aggregate(filter))
+        collection= self.db[collection]
+        return list(collection.aggregate(query))
 
     def bulk_write(self,bulk_operations,collection:str):
         """
@@ -184,38 +184,5 @@ class Mongo:
         results
 
         """
-        collection=self.client[collection]
-        return self.collection.bulk_write(bulk_operations)
-
-        
-    
-    # def get_current_month_data(self,current_expiry:date):
-
-    #     """
-    #     Args:
-    #     current_expiry:date
-        
-    #     Returns:
-    #     pd.DataFrame of current month data
-
-    #     """
-    #     return pd.DataFrame(self.find_many({
-    #         "Expiry":pd.to_datetime(current_expiry)
-    #     },'processed_options_data'))
-    
-    # def get_last_two_months_data(self,prev_one_month_expiry:datetime.date,prev_second_month_expiry:datetime.date):
-        
-    #     # today=today
-    #     # new_date=today-relativedelta(months=1)
-        
-    #     # prev_one_month_expiry=self.get_expiry(new_date.year,new_date.month)
-        
-    #     # new_date=today-relativedelta(months=3)
-        
-    #     # prev_second_month_expiry=self.get_expiry(new_date.year,new_date.month)
-        
-    #     return pd.DataFrame(self.find_many({
-    #     "Expiry":{
-    #         "$lte":pd.to_datetime(prev_one_month_expiry),"$gt":pd.to_datetime(prev_second_month_expiry),
-    #     }
-    # })))
+        collection= self.db[collection]
+        return collection.bulk_write(bulk_operations)

@@ -6,9 +6,9 @@ from datetime import date, datetime,timedelta
 import time
 from dateutil.relativedelta import relativedelta
 import pandas as pd
-from nse_downloader import NSEDownloader
+from data.nse_downloader import NSEDownloader
 from pymongo import UpdateMany
-from mongodb import Mongo
+from data.mongodb import Mongo
 from data.util import get_week
 
 class ProcessData:
