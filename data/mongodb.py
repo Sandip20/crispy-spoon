@@ -152,6 +152,16 @@ class Mongo:
         collection=self.client[collection]
         collection.delete_one(filter)
 
+    def delete_many(self, filter: Dict[str, Any],collection) -> None:
+        """
+        Deletes a multiple document from the collection that matches the specified filter.
+
+        Args:
+            filter (Dict[str, Any]): A dictionary that represents the filter criteria.
+        """
+        collection=self.client[collection]
+        collection.delete_many(filter)
+
     def aggregate(self,query:Dict[str, Any],collection:str)->List[Dict[str, Any]]:
         """
         Args:

@@ -5,13 +5,15 @@ calls respective methods
 import asyncio
 from datetime import timedelta,datetime,date
 from dateutil.relativedelta import relativedelta
+import time
 import os
 # from data.constants import MONTHS_IN_YEAR
 import pandas as pd
 from data.mongodb import Mongo
 
 from data.nse_downloader import NSEDownloader
-from data.util import data_frame_to_dict, map_symbol_name
+from data.process import ProcessData
+from data.util import data_frame_to_dict, map_symbol_name,get_strike
 
 class OptionWizard:
     """
@@ -25,6 +27,7 @@ class OptionWizard:
         # connection with mongodb
         self.mongo=Mongo(url=url,db_name=os.environ['MONGO_INITDB_DATABASE'],is_ca_required=True)
         self.nse_downloader= NSEDownloader()
+        self.process_data= ProcessData()
         self.last_accessed_date_fut=self.get_last_accessed('fut')
         self.last_accessed_date_opt=self.get_last_accessed('opt')
         self.get_tickers()
@@ -63,7 +66,7 @@ class OptionWizard:
         self.df_dict=df_dict
         self.lot_size=symbol_lot_details
         self.tickers=tickers
-        
+
     async def update_futures_data(self):
         """
         updates the futures data till date from last_accessed_date_fut inclusive
@@ -103,8 +106,106 @@ class OptionWizard:
         except Exception as e:
             print(f"Error downloading Futures data for {ticker}: {e}")
 
+    
+    async def download_historical_options(self,start_date,end_date,update_daily=True):
+        self.request_count=2
+        ohlc_futures = []
+        if update_daily:
+            ohlc_futures = self.mongo.find_many(
+            {"Date": {"$gte": pd.to_datetime(self.last_accessed_date_opt)}
+             },
+             'stock_futures'
+            )
+        else:
+            prev_month = start_date.month - 1 or 12
+            year = start_date.year - (prev_month == 12)
+
+            prev_expiry = self.nse_downloader.get_expiry(year, prev_month) + pd.Timedelta(days=1)
+            expiry_next = self.nse_downloader.get_expiry(end_date.year, end_date.month)
+            ohlc_futures = self.mongo.find_many(
+                {"Date": {"$gte": pd.to_datetime(prev_expiry), "$lte": pd.to_datetime(expiry_next)}},
+                'stock_futures'
+            )
+
+        step_dict = self.df_dict
+        tasks=[]
+        filtered_ohlc_futures = [
+            record for record in  ohlc_futures
+            if record['Symbol'] in self.tickers ]
+
+        for ohlc_fut in filtered_ohlc_futures:
+            symbol = map_symbol_name(ohlc_fut["Symbol"]) 
+            step=step_dict[symbol]
+            end_date=ohlc_fut["Expiry"]
+
+            #all dates of current month
+            # get step of the sticker 
+            s_date=ohlc_fut['Date']
+            close=float(ohlc_fut["Close"])
+            strike_price=get_strike(close,step)
+            tasks.append(asyncio.ensure_future(
+                self.nse_downloader. _download_historical_options_v3(
+                    symbol,
+                    s_date,
+                    end_date,
+                    strike_price,
+                    float(ohlc_fut['Close']),
+                    "CE"
+                    )))
+            tasks.append(asyncio.ensure_future(
+                self.nse_downloader._download_historical_options_v3(
+                symbol,
+                s_date,
+                end_date,
+                strike_price,
+                ohlc_fut['Close'],
+                "PE"
+                )))
+            
+            if(self.request_count%150 == 0):
+                await asyncio.sleep(5)
+            self.request_count += 2
+        await asyncio.gather(*tasks)
+        
+    def update_security_names(self):
+        try:
+            self.mongo.update_many({'Symbol':'LTI'},{'Symbol':'LTIM'},'stock_futures')
+            self.mongo.update_many({'Symbol':'LTI'},{'Symbol':'LTIM'},'stock_options')
+        except Exception as e:
+            print(e)
+
     def update_daily(self):
+        start_time = time.time()
         asyncio.run(self.update_futures_data()) 
+       
+        end_time = time.time()
+        execution_time = end_time - start_time
+        print(f"Execution time: {execution_time} seconds")
+        self.mongo.update_one(
+            {'last_accessed_date':self.last_accessed_date_fut,'instrument':'fut'},
+            {'last_accessed_date':pd.to_datetime(date.today())},
+            'activity'
+            )
+        print("--------------futures updated------------")
+
+        start_time = time.time()
+        start_date=pd.to_datetime(date.today())
+        asyncio.run(self.download_historical_options(start_date,start_date))
+        end_time = time.time()
+        execution_time = end_time - start_time
+        print(f"Execution time: {execution_time} seconds")
+        # update the last accessed date of updates
+        self.mongo.update_one(
+            {'last_accessed_date':self.last_accessed_date_opt,'instrument':'opt'},
+            {'last_accessed_date':pd.to_datetime(date.today())},
+            'activity'
+            )
+        self.update_security_names()
+        self.process_data.add_ce_pe_of_same_date(start_date=start_date,end_date=start_date)
+        print('data processing')
+        self.process_data.update_week_min_coverage()
+        self.process_data.update_current_vs_prev_two_months(today=True).to_csv('current.csv')
+        print('CSV generated')
 
 
     
