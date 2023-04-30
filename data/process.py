@@ -2,6 +2,7 @@
 """
 This module will be responsible to process the data
 """
+import os
 from datetime import date, datetime,timedelta
 import time
 from dateutil.relativedelta import relativedelta
@@ -10,7 +11,7 @@ from pymongo import UpdateMany
 from data.nse_downloader import NSEDownloader
 from data.mongodb import Mongo
 from data.queries.mongo_queries_processed_options import ADD_CE_PE_PIPELINE
-from data.util import get_week
+from data.util import get_last_business_day, get_week
 
 class ProcessData:
     """
@@ -74,7 +75,7 @@ class ProcessData:
                     }
                 ]
 
-            for rec in self.mongo.aggregate(query,'processed_options_data'):
+            for rec in self.mongo.aggregate(query, os.environ['STRADDLE_COLLECTION_NAME']):
                 self.mongo.update_many( {
                         "symbol":rec['symbol'],
                         "weeks_to_expiry":rec['weeks_to_expiry'],
@@ -84,7 +85,7 @@ class ProcessData:
                     },{
                             "week_min_coverage":rec['week_min_coverage']
                             },
-                            'processed_options_data')
+                             os.environ['STRADDLE_COLLECTION_NAME'])
         for symbol in current_month["symbol"].unique():
             for week in current_month["weeks_to_expiry"].unique():
                 mask1=current_month["weeks_to_expiry"]==week
@@ -107,7 +108,7 @@ class ProcessData:
                         "current_vs_prev_two_months":rec['current_vs_prev_two_months'],
                         "two_months_week_min_coverage":rec["two_months_week_min_coverage"]
                 },
-                'processed_options_data'
+                 os.environ['STRADDLE_COLLECTION_NAME']
                 )
         current_month.to_csv(f"./data/{'current_month'}.csv")
         last_two_months_data.to_csv("./data/consolidated.csv")
@@ -161,10 +162,10 @@ class ProcessData:
             self.mongo.update_many(
                 { "Date": {"$lte": pd.to_datetime(next_expiry),"$gte": pd.to_datetime(from_expiry_date)}},
                 {"week_min_coverage": ""},
-                'processed_options_data'
+                 os.environ['STRADDLE_COLLECTION_NAME']
             )
 
-            aggregated = self.mongo.aggregate(pipeline,'processed_options_data')
+            aggregated = self.mongo.aggregate(pipeline, os.environ['STRADDLE_COLLECTION_NAME'])
             bulk_operations = [
                         UpdateMany(
                             {
@@ -209,10 +210,10 @@ class ProcessData:
             self.mongo.update_many(
                 { "Date": {"$lte": pd.to_datetime(expiry_date),"$gt": pd.to_datetime(from_expiry_date)}},
                {"week_min_coverage": ""},
-              'processed_options_data'
+               os.environ['STRADDLE_COLLECTION_NAME']
             )
 
-            aggregated = self.mongo.aggregate(query,'processed_options_data')
+            aggregated = self.mongo.aggregate(query, os.environ['STRADDLE_COLLECTION_NAME'])
             bulk_operations = [
                         UpdateMany(
                             {
@@ -226,31 +227,33 @@ class ProcessData:
             print(f"Modified {result.modified_count} documents")
     def add_ce_pe_of_same_date(self, start_date, end_date):
         if start_date and end_date:
+            current_expiry = self.get_current_month_expiry()
             prev_expiry = self.nse_downloader.get_expiry(
-                start_date.year if start_date.month != 1 else start_date.year - 1,
-                start_date.month-1 if start_date.month!=1 else 12) + timedelta(days=1)
-            next_expiry = self.nse_downloader.get_expiry(end_date.year, end_date.month)
+                current_expiry.year if current_expiry.month != 1 else current_expiry.year - 1,
+                current_expiry.month-1 if current_expiry.month!=1 else 12,1) + timedelta(days=1)
+            
+        
             match_query = {
                 "$match": {
                     "Date": {
                         "$gte": pd.to_datetime(prev_expiry),
-                        "$lte": pd.to_datetime(next_expiry)
+                        "$lte": pd.to_datetime(current_expiry)
                     }
                 }
             }
             ADD_CE_PE_PIPELINE.insert(0, match_query)
             self.mongo.delete_many(
                 {"Date": {"$gte": pd.to_datetime(prev_expiry),
-                "$lte": pd.to_datetime(next_expiry)}},
-                'processed_options_data'
+                "$lte": pd.to_datetime(current_expiry)}},
+                 os.environ['STRADDLE_COLLECTION_NAME']
                 )
         aggregated =self.mongo.aggregate(ADD_CE_PE_PIPELINE,'stock_options')
         if aggregated:
-            self.mongo.insert_many(aggregated,'processed_options_data')
+            self.mongo.insert_many(aggregated, os.environ['STRADDLE_COLLECTION_NAME'])
         print("Processed successfully")
 
     def get_current_month_data(self,current_expiry:date):
-        return pd.DataFrame(self.mongo.find_many ({"Expiry":pd.to_datetime(current_expiry)},'processed_options_data'))
+        return pd.DataFrame(self.mongo.find_many ({"Expiry":pd.to_datetime(current_expiry)}, os.environ['STRADDLE_COLLECTION_NAME']))
     def get_last_two_months_data(self,today:date)->pd.DataFrame:
         """
         Args:
@@ -268,7 +271,16 @@ class ProcessData:
             "$lte":pd.to_datetime(prev_one_month_expiry),
             "$gt":pd.to_datetime(prev_second_month_expiry),
         }
-    },'processed_options_data'))
+    }, os.environ['STRADDLE_COLLECTION_NAME']))
+    def get_current_month_expiry(self):
+        """
+        Returns:current month expiry 
+        """
+        holidays=self.nse_downloader.get_nse_holidays()
+        last_working_day:datetime=get_last_business_day(date.today(),holidays)
+        return self.nse_downloader.get_expiry(last_working_day.year,last_working_day.month,last_working_day.day)
+           
+   
 
     def update_current_vs_prev_two_months(self,start_date=None,end_date=None,today=False):
         """
@@ -278,6 +290,7 @@ class ProcessData:
         today:  it takes current day as start point and process the current month and prev two month currosponding to currentday
         """
         print("------updating Current Vs PreviousTwo months data----------")
+
         def process_monthly_data(current_month,last_two_months):
             if 'two_months_week_min_coverage' in current_month.columns:
                 current_month=current_month.drop(columns='two_months_week_min_coverage')
@@ -302,13 +315,14 @@ class ProcessData:
                             "weeks_to_expiry":rec["weeks_to_expiry"],
                     }
                 ) for rec in current_month.to_dict('records')
-            ],'processed_options_data')
+            ], os.environ['STRADDLE_COLLECTION_NAME'])
             return current_month
             
         if today:
-            today=date.today()
-            current_expiry=self.nse_downloader.get_expiry(today.year,today.month)
+            current_expiry=self.get_current_month_expiry()
             current_month = self.get_current_month_data(current_expiry)
+            print('current-month',current_month.columns)
+
             last_two_months = self.get_last_two_months_data(current_expiry)
             current_month=process_monthly_data(current_month=current_month,last_two_months=last_two_months)
             mask= current_month["current_vs_prev_two_months"]>-5

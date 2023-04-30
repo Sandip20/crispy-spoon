@@ -117,8 +117,14 @@ class Mongo:
         Returns:
             List[Dict[str, Any]]: A list of dictionaries that represent the matching documents, or an empty list if no documents match.
         """
+        print(collection,filter)
+
         collection= self.db[collection]
-        return list(collection.find(filter))
+        
+        result= list(collection.find(filter))
+        
+        
+        return result
 
     def update_one(self, filter: Dict[str, Any], update: Dict[str, Any],collection:str) -> None:
         """

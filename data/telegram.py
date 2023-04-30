@@ -13,10 +13,10 @@ class Telegram:
         self.tg_api_token=tg_api_token
         self.tg_chat_id=tg_chat_id
         
-    def send_to_telegram(self, cheapest_records,today,holidays,exclusions):
+    def send_to_telegram(self, cheapest_records,today,holidays):
         # Define column names and calculate maximum symbol length
         columns = ['Symbol', 'Strike', 'Straddle Premium', '%Coverage', 'Current vs prev two months']      
-        next_business_day=get_next_business_day(today,holidays,exclusions,days=5)
+        next_business_day=get_next_business_day(today,holidays,days=5)
         # Format message header
         bot_message = f"<b>Scripts for {next_business_day}</b>\n\n"
 

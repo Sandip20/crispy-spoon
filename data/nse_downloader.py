@@ -35,6 +35,9 @@ class NSEDownloader:
         
     def close_connection(self):
         self.nse_india.session.close()
+    
+    def get_nse_holidays(self):
+        return self.nse_india.get_nse_holidays()
 
     def download_file(self,file_path):
         folder_name="files"
@@ -120,7 +123,7 @@ class NSEDownloader:
             print(f"Error downloading futures data for {ticker}: {error}")
     def get_oneday_options_history(
             self, ticker:str, opt_type:str,
-            start_date:datetime, expiry_date:datetime, strike:float):
+            start_date:datetime, end_date:datetime, expiry_date:datetime, strike:float):
         """
         Returns the one-day options history for a given ticker symbol, option type,
         expiry date, and strike price, as retrieved from the NSE India API.
@@ -149,13 +152,14 @@ class NSEDownloader:
         return self.nse_india.get_history(
             symbol=ticker,
             from_date=start_date,
-            to_date=start_date,
+            to_date=end_date,
             expiry_date=expiry_date,
             option_type=opt_type,
             strike_price=strike
         )
     async def download_historical_options(self, symbol: str, s_date: datetime,
                                               end_date: datetime,
+                                              expiry_date:datetime,
                                               strike_price: float,
                                               fut_close: float,
                                               option_type: str) -> pd.DataFrame:
@@ -181,7 +185,7 @@ class NSEDownloader:
             loop = asyncio.get_event_loop()
             opt_data = await loop.run_in_executor(None, self.get_oneday_options_history, symbol,
                                                   option_type, s_date,
-                                                  end_date, strike_price)
+                                                  end_date, expiry_date, strike_price)
             opt_data['days_to_expiry'] = (end_date - s_date).days
             opt_data['fut_close'] = fut_close
             return opt_data

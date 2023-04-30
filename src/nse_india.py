@@ -154,10 +154,9 @@ class NSE:
             json_data = response.json()
 
             for exp_date in  json_data['years'][to_date.split('-')[2]]:
-                if  datetime.strptime(exp_date, DATE_FORMAT_B).date() <= datetime.strptime(from_date, DATE_FORMAT).date():
-                    continue
-                date_string=exp_date
-                break
+                if  datetime.strptime(exp_date, DATE_FORMAT_B).date() >= datetime.strptime(from_date, DATE_FORMAT).date():
+                    date_string=exp_date
+                    break
 
 
 
