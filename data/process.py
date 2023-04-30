@@ -6,9 +6,10 @@ from datetime import date, datetime,timedelta
 import time
 from dateutil.relativedelta import relativedelta
 import pandas as pd
-from data.nse_downloader import NSEDownloader
 from pymongo import UpdateMany
+from data.nse_downloader import NSEDownloader
 from data.mongodb import Mongo
+from data.queries.mongo_queries_processed_options import ADD_CE_PE_PIPELINE
 from data.util import get_week
 
 class ProcessData:
@@ -224,79 +225,6 @@ class ProcessData:
             result=self.mongo.bulk_write(bulk_operations)
             print(f"Modified {result.modified_count} documents")
     def add_ce_pe_of_same_date(self, start_date, end_date):
-
-        pipeline = [
-            {
-
-                '$group': {
-                            '_id': {
-                                'symbol': '$Symbol',
-                                'Date': '$Date',
-                                'strike_price': '$Strike Price',
-                                'Expiry': '$Expiry',
-                                'days_to_expiry': '$days_to_expiry',
-                                'weeks_to_expiry': '$weeks_to_expiry',
-                                'fut_close': '$fut_close',
-                                'option_type': '$Option Type',
-                                'close': '$Close'
-                            },
-                },
-            },
-            {
-                '$group': {
-                    '_id': {
-                        'symbol': '$_id.symbol',
-                        'Date': '$_id.Date',
-                        'strike_price': '$_id.strike_price',
-                        'Expiry': '$_id.Expiry',
-                        'days_to_expiry': '$_id.days_to_expiry',
-                        'weeks_to_expiry': '$_id.weeks_to_expiry',
-                        'fut_close': '$_id.fut_close',
-                    },
-                    'premiums': {
-                        '$push': '$_id.close'
-                    },
-                    'option_types': {
-                        '$addToSet': '$_id.option_type'
-                    }
-                }
-            },
-
-            {
-                '$project': {
-                    'symbol': '$_id.symbol',
-                    'premiums': '$premiums',
-                    'strike': '$_id.strike_price',
-                    'Date': '$_id.Date',
-                    'Expiry': '$_id.Expiry',
-                    'days_to_expiry': '$_id.days_to_expiry',
-                    'weeks_to_expiry': '$_id.weeks_to_expiry',
-                    'fut_close': {'$toDouble':'$_id.fut_close'},
-                    'straddle_premium': {
-                        '$sum': '$premiums'
-                    },
-                    '_id': 0
-                }
-            },
-            {
-                '$project': {
-                    'symbol': '$symbol',
-                    'premiums': '$premiums',
-                    'strike': '$strike',
-                    'Date': '$Date',
-                    'Expiry': '$Expiry',
-                    'days_to_expiry': '$days_to_expiry',
-                    'weeks_to_expiry': '$weeks_to_expiry',
-                    'straddle_premium': '$straddle_premium',
-                    '%coverage': {
-                        '$multiply': [
-                            {'$divide': ['$straddle_premium', '$fut_close']},
-                            100
-                        ]
-                    }
-                }
-            }
-        ]
         if start_date and end_date:
             prev_expiry = self.nse_downloader.get_expiry(
                 start_date.year if start_date.month != 1 else start_date.year - 1,
@@ -310,17 +238,16 @@ class ProcessData:
                     }
                 }
             }
-            pipeline.insert(0, match_query)
+            ADD_CE_PE_PIPELINE.insert(0, match_query)
             self.mongo.delete_many(
                 {"Date": {"$gte": pd.to_datetime(prev_expiry),
                 "$lte": pd.to_datetime(next_expiry)}},
                 'processed_options_data'
                 )
-        aggregated =self.mongo.aggregate(pipeline,'stock_options')
+        aggregated =self.mongo.aggregate(ADD_CE_PE_PIPELINE,'stock_options')
         if aggregated:
             self.mongo.insert_many(aggregated,'processed_options_data')
         print("Processed successfully")
-
 
     def get_current_month_data(self,current_expiry:date):
         return pd.DataFrame(self.mongo.find_many ({"Expiry":pd.to_datetime(current_expiry)},'processed_options_data'))
@@ -344,11 +271,16 @@ class ProcessData:
     },'processed_options_data'))
 
     def update_current_vs_prev_two_months(self,start_date=None,end_date=None,today=False):
+        """
+        Args:
+        start_date: start date of the month for which we need to  perform the operation update curr_vs_prev_two months
+        end_date: end date of the month for which we need to  perform the operation update curr_vs_prev_two months
+        today:  it takes current day as start point and process the current month and prev two month currosponding to currentday
+        """
         print("------updating Current Vs PreviousTwo months data----------")
         def process_monthly_data(current_month,last_two_months):
             if 'two_months_week_min_coverage' in current_month.columns:
                 current_month=current_month.drop(columns='two_months_week_min_coverage')
-                
             if 'week_min_coverage' in current_month.columns:
                 current_month=current_month.drop(columns='week_min_coverage')
          

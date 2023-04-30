@@ -2,7 +2,7 @@
 """
 This module is responsible for downloading the files csv and  F&O data from  nse
 """
-
+import os
 import asyncio
 from datetime import timedelta,datetime
 import pandas as pd
@@ -35,6 +35,19 @@ class NSEDownloader:
         
     def close_connection(self):
         self.nse_india.session.close()
+
+    def download_file(self,file_path):
+        folder_name="files"
+        if not os.path.exists(folder_name):
+            os.makedirs(folder_name)
+            
+        file_name = os.path.split(file_path)[1]
+        url=f"{os.environ['NSE_FO_ARCHIVE_URL']}{file_name}"
+        print(f"myurls:{url}")
+        response = requests.get(url)
+        
+        with open(file_path, "wb") as f:
+            f.write(response.content)
                
     def get_expiry(self, year:int, month:int,day:int=1)->datetime.date:
         """Get the expiry date of a contract for the specified year and month.
@@ -141,7 +154,7 @@ class NSEDownloader:
             option_type=opt_type,
             strike_price=strike
         )
-    async def _download_historical_options_v3(self, symbol: str, s_date: datetime,
+    async def download_historical_options(self, symbol: str, s_date: datetime,
                                               end_date: datetime,
                                               strike_price: float,
                                               fut_close: float,
@@ -179,7 +192,7 @@ class NSEDownloader:
         except requests.exceptions.RequestException as error:
             print(f"Error downloading Options data for {symbol} option Type:{type}: {error}")
 
-    async def _update_futures_data_v3(self,ticker:str,start:datetime,end:datetime,expiry_date:datetime) ->pd.DataFrame :
+    async def update_futures_data(self,ticker:str,start:datetime,end:datetime,expiry_date:datetime) ->pd.DataFrame :
         """
         Download historical futures data for a given ticker.
 

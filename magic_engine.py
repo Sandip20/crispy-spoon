@@ -1,3 +1,4 @@
+# pylint: disable=broad-exception-caught
 """ 
 OptionWizard class  is main class which will  import neccessary modules and 
 calls respective methods
@@ -13,7 +14,7 @@ from data.mongodb import Mongo
 from dotenv import load_dotenv
 from data.nse_downloader import NSEDownloader
 from data.process import ProcessData
-from data.util import data_frame_to_dict, map_symbol_name,get_strike
+from data.util import data_frame_to_dict, get_week, map_symbol_name,get_strike
 load_dotenv()
 
 class OptionWizard:
@@ -108,14 +109,28 @@ class OptionWizard:
         download the data for given input mongo insertmany  to insert into  stock_futures
         """
         try:
-            ohlc_fut = await self.nse_downloader._update_futures_data_v3(ticker,start,end,expiry_date)
+            ohlc_fut = await self.nse_downloader.update_futures_data(ticker,start,end,expiry_date)
             if not ohlc_fut.empty:
                 data=data_frame_to_dict(ohlc_fut)
                 self.mongo.insert_many(data,'stock_futures')
         except Exception as e:
             print(f"Error downloading Futures data for {ticker}: {e}")
 
-    
+    async def _download_historical_options_v3(self,symbol:str, s_date,end_date,strike_price,fut_close,option_type):
+          
+        try:
+            option_ohlc= await self.nse_downloader.download_historical_options(symbol,s_date,
+                end_date,
+                strike_price,
+                fut_close,
+                option_type
+                )
+            option_ohlc['weeks_to_expiry']=option_ohlc['days_to_expiry'].apply(get_week)
+            self.mongo.insert_many(data_frame_to_dict(option_ohlc),'stock_options')
+        except Exception as e:
+            print(f"Error downloading Futures data for {symbol}: {e}")
+
+
     async def download_historical_options(self,start_date,end_date,update_daily=True):
         self.request_count=2
         ohlc_futures = []
@@ -153,7 +168,7 @@ class OptionWizard:
             close=float(ohlc_fut["Close"])
             strike_price=get_strike(close,step)
             tasks.append(asyncio.ensure_future(
-                self.nse_downloader. _download_historical_options_v3(
+                self._download_historical_options_v3(
                     symbol,
                     s_date,
                     end_date,
@@ -162,7 +177,7 @@ class OptionWizard:
                     "CE"
                     )))
             tasks.append(asyncio.ensure_future(
-                self.nse_downloader._download_historical_options_v3(
+                self._download_historical_options_v3(
                 symbol,
                 s_date,
                 end_date,
