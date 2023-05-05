@@ -4,7 +4,7 @@ OptionWizard class  is main class which will  import neccessary modules and
 calls respective methods
 """
 import asyncio
-from datetime import timedelta,datetime,date
+from datetime import timedelta,datetime,date, timezone
 from dateutil.relativedelta import relativedelta
 import time
 import os
@@ -14,7 +14,7 @@ from data.mongodb import Mongo
 from dotenv import load_dotenv
 from data.nse_downloader import NSEDownloader
 from data.process import ProcessData
-from data.util import data_frame_to_dict, get_week,get_strike
+from data.util import data_frame_to_dict, get_last_business_day, get_week,get_strike
 load_dotenv()
 
 class OptionWizard:
@@ -127,7 +127,7 @@ class OptionWizard:
         except Exception as e:
             print(f"Error downloading Futures data for {symbol}: {e}")
 
-
+       
     async def download_historical_options(self,start_date,end_date,update_daily=True):
         self.request_count=2
         ohlc_futures = []
@@ -142,6 +142,8 @@ class OptionWizard:
             year = start_date.year - (prev_month == 12)
 
             prev_expiry = self.nse_downloader.get_expiry(year, prev_month) + pd.Timedelta(days=1)
+            holidays=self.nse_downloader.get_nse_holidays()
+            end_date= get_last_business_day(end_date,holidays)
             expiry_next = self.nse_downloader.get_expiry(end_date.year, end_date.month)
             ohlc_futures = self.mongo.find_many(
                 {"Date": {"$gte": pd.to_datetime(prev_expiry), "$lte": pd.to_datetime(expiry_next)}},
@@ -153,6 +155,8 @@ class OptionWizard:
         filtered_ohlc_futures = [
             record for record in  ohlc_futures
             if record['Symbol'] in self.tickers ]
+        
+        print('total coun:',len(filtered_ohlc_futures))
 
         for ohlc_fut in filtered_ohlc_futures:
             symbol = ohlc_fut["Symbol"]
@@ -194,33 +198,33 @@ class OptionWizard:
             self.mongo.update_many({'Symbol':'LTI'},{'Symbol':'LTIM'},'stock_options')
         except Exception as e:
             print(e)
-
+            
     def update_daily(self):
-        # start_time = time.time()
-        # asyncio.run(self.update_futures_data()) 
+        start_time = time.time()
+        asyncio.run(self.update_futures_data()) 
        
-        # end_time = time.time()
-        # execution_time = end_time - start_time
-        # print(f"Execution time: {execution_time} seconds")
-        # self.mongo.update_one(
-        #     {'last_accessed_date':self.last_accessed_date_fut,'instrument':'fut'},
-        #     {'last_accessed_date':pd.to_datetime(date.today())},
-        #     'activity'
-        #     )
+        end_time = time.time()
+        execution_time = end_time - start_time
+        print(f"Execution time: {execution_time} seconds")
+        self.mongo.update_one(
+            {'last_accessed_date':self.last_accessed_date_fut,'instrument':'fut'},
+            {'last_accessed_date':pd.to_datetime(date.today())},
+            'activity'
+            )
         print("--------------futures updated------------")
 
-        # start_time = time.time()
+        start_time = time.time()
         start_date=pd.to_datetime(date.today())
-        # asyncio.run(self.download_historical_options(start_date,start_date))
-        # end_time = time.time()
-        # execution_time = end_time - start_time
-        # print(f"Execution time: {execution_time} seconds")
+        asyncio.run(self.download_historical_options(start_date,start_date))
+        end_time = time.time()
+        execution_time = end_time - start_time
+        print(f"Execution time: {execution_time} seconds")
         # update the last accessed date of updates
-        # self.mongo.update_one(
-        #     {'last_accessed_date':self.last_accessed_date_opt,'instrument':'opt'},
-        #     {'last_accessed_date':pd.to_datetime(date.today())},
-        #     'activity'
-        #     )
+        self.mongo.update_one(
+            {'last_accessed_date':self.last_accessed_date_opt,'instrument':'opt'},
+            {'last_accessed_date':pd.to_datetime(date.today())},
+            'activity'
+            )
         # self.update_security_names()
         self.process_data.add_ce_pe_of_same_date(start_date=start_date,end_date=start_date)
         print('data processing')

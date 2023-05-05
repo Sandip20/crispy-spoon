@@ -13,6 +13,7 @@ from threading import Thread
 from dotenv import load_dotenv
 from dateutil.relativedelta import relativedelta
 import asyncio
+from data.util import get_last_business_day
 from src.nse_india import NSE
 ca = certifi.where()
 load_dotenv()
@@ -23,6 +24,7 @@ import warnings
 
 warnings.simplefilter(action="ignore", category=FutureWarning)
 exclusions=["Saturday","Sunday"]
+
 class OptionWizard:
     col=['Symbol','Expiry','Open','High','Low','Close']
    
@@ -125,6 +127,7 @@ class OptionWizard:
         
         # Print the result
         print(f"Inserted {result.acknowledged} new records")
+
     def get_strike(self,price,step):
         r=(price%step)
         if r < (step/2):
@@ -198,9 +201,9 @@ class OptionWizard:
         tickers=self.tickers
         tasks=[]
         for ticker in tickers:
-            if(self.map_symbol_name(ticker) is not None):
+            if self.map_symbol_name(ticker) is not None :
                 ticker=self.map_symbol_name(ticker)
-            no_of_months=(relativedelta(end_date,start_date).months+1)
+            no_of_months=relativedelta(end_date,start_date).months+1
             month=_month
             year=_year
             while no_of_months>0 :
@@ -215,57 +218,15 @@ class OptionWizard:
                 no_of_months-=1
         await asyncio.gather(*tasks)
         print('download completed')
- 
-    def future_input_for_optionsV2(self, start_date, end_date, update_daily=False):
-        ohlc_futures = []
-        if update_daily:
-            last_accessed_date_opt = self.last_accessed_date_opt
-            ohlc_futures = self.stock_futures.find(
-                {"Date": {"$gte": pd.to_datetime(last_accessed_date_opt)}},
-                {"Symbol": 1, "Expiry": 1, "Close": 1, "Date": 1, "_id": 0}
-            )
-        else:
-            prev_month = start_date.month - 1 or 12
-            year = start_date.year - (prev_month == 12)
-            prev_expiry = self.get_expiry(year, prev_month) + pd.Timedelta(days=1)
-            expiry_next = self.get_expiry(end_date.year, end_date.month)
-            ohlc_futures = self.stock_futures.find(
-                {"Date": {"$gte": pd.to_datetime(prev_expiry), "$lte": pd.to_datetime(expiry_next)}},
-                {"Symbol": 1, "Expiry": 1, "Close": 1, "Date": 1, "_id": 0}
-            )
-        step_dict = self.df_dict
-        for ohlc_fut in ohlc_futures:
-            symbol = ohlc_fut["Symbol"]
-            if symbol == "LTI":
-                symbol = "LTIM"
-            if symbol not in self.tickers:
-                continue
-            # if (symbol, ohlc_fut['Date']) in already_exists:
-            #     continue
-            options_data = self.stock_options.count_documents(
-                {"Symbol": symbol, "Date": ohlc_fut['Date']})
-            if options_data == 2:
-                continue
-            step=step_dict[symbol]
-            end_date=ohlc_fut["Expiry"]
-            #all dates of current month
-            # get step of the sticker 
-            s_date=ohlc_fut['Date']
-            close=float(ohlc_fut["Close"])
-            strike_price=self.get_strike(close,step)
-            input_dict= {
-                "end_date":end_date,
-                "symbol":self.map_symbol_name(symbol),
-                "s_date":s_date,
-                "close":close,
-                "strike_price":strike_price,
-                "fut_close":float(ohlc_fut['Close']),
-                "type":"CE"
-            }
-            q.put(input_dict)
-            input_dict_copy=input_dict.copy()
-            input_dict_copy['type']="PE"
-            q.put(input_dict_copy)
+
+    def get_month_expiry(self,end_date:datetime):
+        """
+        Returns:current month expiry 
+        """
+        holidays=self.nse_india.get_nse_holidays()
+        last_working_day:datetime=get_last_business_day(end_date,holidays)
+        return self.nse_india.get_expiry_date(last_working_day.year,last_working_day.month,last_working_day.day)
+    
     def add_ce_pe_of_same_dateV2(self, start_date, end_date):
         pipeline = [
            {
@@ -342,7 +303,7 @@ class OptionWizard:
             prev_expiry = self.get_expiry(
                 start_date.year if start_date.month != 1 else start_date.year - 1, 
                 start_date.month-1 if start_date.month!=1 else 12) + timedelta(days=1)
-            next_expiry = self.get_expiry(end_date.year, end_date.month)
+            next_expiry = self.get_month_expiry(end_date)
             match_query = {
                 "$match": {
                     "Date": {
@@ -354,6 +315,9 @@ class OptionWizard:
             pipeline.insert(0, match_query)
             self.processed_options_data.delete_many({"Date": {"$gte": pd.to_datetime(prev_expiry), "$lte": pd.to_datetime(next_expiry)}})
         aggregated = list(self.stock_options.aggregate(pipeline))
+        df =pd.DataFrame(aggregated)
+        df['weeks_to_expiry']=df['days_to_expiry'].apply(self.get_week)
+        aggregated=df.to_dict('records')
         if aggregated:
             self.processed_options_data.insert_many(aggregated)
         print("Processed successfully")
@@ -371,7 +335,8 @@ class OptionWizard:
             prev_month = start_date.month - 1 or 12
             year = start_date.year - (prev_month == 12)
             prev_expiry = self.get_expiry(year, prev_month) + pd.Timedelta(days=1)
-            expiry_next = self.get_expiry(end_date.year, end_date.month)
+            expiry_next =self.get_month_expiry(end_date)
+
             ohlc_futures = list(self.stock_futures.find(
                 {"Date": {"$gte": pd.to_datetime(prev_expiry), "$lte": pd.to_datetime(expiry_next)}},
                 {"Symbol": 1, "Expiry": 1, "Close": 1, "Date": 1, "_id": 0}
@@ -579,65 +544,65 @@ class OptionWizard:
         ]
         return {'day':today,"cheapest_options":list(self.processed_options_data.aggregate(query))}
     
-    def download_options_for_pnl(self,back_test=False):
-        for order in self.orders.find():
-            if back_test:
-                end=order['created_at']+timedelta(days=3)
-                result =list(self.options_data.find({'Symbol':order['symbol'],"Date":pd.to_datetime(end)}))
-                if(len(result)):
-                    continue
-                data=get_history(
-                    symbol= self.map_symbol_name(order['symbol']),
-                    start=order['created_at'],
-                    end=end,
-                    strike_price=order['strike'],
-                    option_type='CE',
-                    expiry_date=order['expiry'])
-                records=self.data_frame_to_dict(data)
-                self.options_data.insert_many(records)  
-                data=get_history(
-                    symbol=self.map_symbol_name(order['symbol']),
-                    start=order['created_at'],
-                    end=end,
-                    strike_price=order['strike'],
-                    option_type='PE',
-                    expiry_date=order['expiry'])
-                records=self.data_frame_to_dict(data)
-                self.options_data.insert_many(records) 
-            else:
-                for day in  range(1,4,1):
-                    end=order['created_at']+timedelta(days=day)
-                    result =list(self.options_data.find({'Symbol':order['symbol'],"Date":pd.to_datetime(end)}))
-                    if(len(result)):
-                        continue
-                    data=get_history(
-                        symbol=order['symbol'],
-                        start=order['created_at'],
-                        end=end,
-                        strike_price=order['strike'],
-                        option_type='CE',
-                        expiry_date=order['expiry'])
-                    records=self.data_frame_to_dict(data)
-                    self.options_data.insert_many(records)  
-                    data=get_history(
-                        symbol=order['symbol'],
-                        start=order['created_at'],
-                        end=end,
-                        strike_price=order['strike'],
-                        option_type='PE',
-                        expiry_date=order['expiry'])
-                    records=self.data_frame_to_dict(data)
-                    self.options_data.insert_many(records)  
+    # def download_options_for_pnl(self,back_test=False):
+    #     for order in self.orders.find():
+    #         if back_test:
+    #             end=order['created_at']+timedelta(days=3)
+    #             result =list(self.options_data.find({'Symbol':order['symbol'],"Date":pd.to_datetime(end)}))
+    #             if(len(result)):
+    #                 continue
+    #             data=get_history(
+    #                 symbol= self.map_symbol_name(order['symbol']),
+    #                 start=order['created_at'],
+    #                 end=end,
+    #                 strike_price=order['strike'],
+    #                 option_type='CE',
+    #                 expiry_date=order['expiry'])
+    #             records=self.data_frame_to_dict(data)
+    #             self.options_data.insert_many(records)  
+    #             data=get_history(
+    #                 symbol=self.map_symbol_name(order['symbol']),
+    #                 start=order['created_at'],
+    #                 end=end,
+    #                 strike_price=order['strike'],
+    #                 option_type='PE',
+    #                 expiry_date=order['expiry'])
+    #             records=self.data_frame_to_dict(data)
+    #             self.options_data.insert_many(records) 
+    #         else:
+    #             for day in  range(1,4,1):
+    #                 end=order['created_at']+timedelta(days=day)
+    #                 result =list(self.options_data.find({'Symbol':order['symbol'],"Date":pd.to_datetime(end)}))
+    #                 if(len(result)):
+    #                     continue
+    #                 data=get_history(
+    #                     symbol=order['symbol'],
+    #                     start=order['created_at'],
+    #                     end=end,
+    #                     strike_price=order['strike'],
+    #                     option_type='CE',
+    #                     expiry_date=order['expiry'])
+    #                 records=self.data_frame_to_dict(data)
+    #                 self.options_data.insert_many(records)  
+    #                 data=get_history(
+    #                     symbol=order['symbol'],
+    #                     start=order['created_at'],
+    #                     end=end,
+    #                     strike_price=order['strike'],
+    #                     option_type='PE',
+    #                     expiry_date=order['expiry'])
+    #                 records=self.data_frame_to_dict(data)
+    #                 self.options_data.insert_many(records)  
 
-    def update_record(self,record,columns,date_of_trade):
-            del record['Date']
-            # del record['two_months_week_min_coverage']
-            # del record['current_vs_prev_two_months']
-            symbol=record[columns[0]]
-            record['created_at']=date_of_trade
-            record['quantity']=symbol if symbol =="COFORGE" else self.lot_size[self.map_symbol_name(symbol)]
-            record['price']= record[columns[2]]
-            return InsertOne(record)
+    # def update_record(self,record,columns,date_of_trade):
+    #         del record['Date']
+    #         # del record['two_months_week_min_coverage']
+    #         # del record['current_vs_prev_two_months']
+    #         symbol=record[columns[0]]
+    #         record['created_at']=date_of_trade
+    #         record['quantity']=symbol if symbol =="COFORGE" else self.lot_size[self.map_symbol_name(symbol)]
+    #         record['price']= record[columns[2]]
+    #         return InsertOne(record)
    
     def get_current_month_data(self,current_expiry:date):
         return pd.DataFrame(list(self.processed_options_data.find({
@@ -727,7 +692,7 @@ class OptionWizard:
 
                         df_new2=df[mask3&mask4]
                        
-                        if df_new2.shape[0]!=0 and df_new2.shape[0]!=0 :
+                        if df_new2.shape[0]!=0:
                             current_month.loc[mask1&mask2,'current_vs_prev_two_months']=round((df_new["%coverage"]-df_new2['week_min_coverage'].unique()[0]),1)
                             current_month.loc[mask1&mask2,'two_months_week_min_coverage']=df_new2['week_min_coverage'].unique()[0]
 
@@ -767,8 +732,8 @@ class OptionWizard:
         except Exception as e:
             print(f"Error downloading Futures data for {ticker}: {e}")
             
-    def get_expiry(self,year,month):
-         return self.nse_india.get_expiry_date(year,month)
+    def get_expiry(self,year,month,day=1):
+         return self.nse_india.get_expiry_date(year,month,day)
         
      
     def start_threads(self,method_name):
@@ -829,29 +794,29 @@ class OptionWizard:
         self. update_security_names()
         self.add_ce_pe_of_same_dateV2(start_date=start_date,end_date=start_date)
         # print('data processing')
-        # # self.update_week_min_coverage()
+        # self.update_week_min_coverage()
         self.update_current_vs_prev_two_months(today=True).to_csv('current.csv')
         print('CSV generated')
     
     # download the historical of all the scripts   till date
     
     def download_historical_v3(self,start_date,end_date):
-        start_time = time.time()
-        asyncio.run(self.download_historical_futures_v3(start_date,end_date)) 
-        end_time = time.time()
-        execution_time = end_time - start_time
+        # start_time = time.time()
+        # asyncio.run(self.download_historical_futures_v3(start_date,end_date)) 
+        # end_time = time.time()
+        # execution_time = end_time - start_time
         
-        print(f"Execution time to download futures: {execution_time} seconds")
-        start_time = time.time()
+        # print(f"Execution time to download futures: {execution_time} seconds")
+        # start_time = time.time()
        
-        asyncio.run(self.download_historical_options_v3(start_date,end_date))
+        # asyncio.run(self.download_historical_options_v3(start_date,end_date,False))
         
-        end_time = time.time()
-        execution_time = end_time - start_time
-        print(f"Execution time to downdload Options: {execution_time} seconds")
-        self. update_security_names()
-        self.add_ce_pe_of_same_dateV2(start_date=start_date,end_date=end_date)
-        self.update_week_min_coverage(start_date=start_date,end_date=end_date)
+        # end_time = time.time()
+        # execution_time = end_time - start_time
+        # print(f"Execution time to downdload Options: {execution_time} seconds")
+        # self. update_security_names()
+        # self.add_ce_pe_of_same_dateV2(start_date=start_date,end_date=end_date)
+        # self.update_week_min_coverage(start_date=start_date,end_date=end_date, update_last_two_months= True)
         self.update_current_vs_prev_two_months(start_date=start_date,end_date=end_date)
         
     def update_security_names(self):
@@ -873,7 +838,7 @@ class OptionWizard:
             prev_expiry = self.get_expiry(
                 start_date.year if start_date.month != 1 else start_date.year - 1, 
                 start_date.month-1 if start_date.month!=1 else 12) + timedelta(days=1)
-            next_expiry = self.get_expiry(end_date.year, end_date.month)
+            next_expiry = self.get_month_expiry(end_date)
             from_expiry_date = prev_expiry
             pipeline = [
                 {
@@ -965,7 +930,8 @@ class OptionWizard:
                             {"$set": {"week_min_coverage": rec['week_min_coverage']}}
                         ) for rec in aggregated]
             result=self.processed_options_data.bulk_write(bulk_operations)
-            print(f"Modified {result.modified_count} documents")     
+            print(f"Modified {result.modified_count} documents")  
+   
     def update_current_vs_prev_two_months(self,start_date=None,end_date=None,today=False):
         print("------updating Current Vs PreviousTwo months data----------")
         def process_monthly_data(current_month,last_two_months):
@@ -978,7 +944,7 @@ class OptionWizard:
             last_two_months = last_two_months[["symbol", "weeks_to_expiry","week_min_coverage"]].rename(columns={"week_min_coverage": "two_months_week_min_coverage"})
             last_two_months = last_two_months.groupby(["symbol", "weeks_to_expiry",]).min().reset_index()
             last_two_months["two_months_week_min_coverage"] = last_two_months["two_months_week_min_coverage"].astype(float)
-            current_month['weeks_to_expiry']=current_month['days_to_expiry'].apply(self.get_week)
+            # current_month['weeks_to_expiry']=current_month['days_to_expiry'].apply(self.get_week)
             current_month = current_month.merge(last_two_months, on=["symbol", "weeks_to_expiry"], how="left")
             current_month["current_vs_prev_two_months"] = (
                 current_month["%coverage"] - current_month["two_months_week_min_coverage"]
@@ -1028,6 +994,8 @@ class OptionWizard:
                 expiry=expiry+relativedelta(months=1)
                 expiry=self.get_expiry(expiry.year,expiry.month)
                 no_of_months-=1
+
+                
     def place_orders(self,cheapest_records,trade_date):
         columns=['symbol',"strike",'straddle_premium',"%coverage"]
         date_of_trade=pd.to_datetime(trade_date)
