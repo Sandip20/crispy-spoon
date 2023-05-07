@@ -4,8 +4,8 @@ Utility Module
 from datetime import timedelta,datetime
 import pandas as pd
 
-from data.constants import DATE_FORMAT_B
-exclusions=["Saturday","Sunday"]
+from data.constants import DATE_FORMAT_B,EXCLUSIONS
+
 def data_frame_to_dict(data_frame):
     """
     Convert a pandas DataFrame to a list of dictionaries.
@@ -30,7 +30,6 @@ def get_next_business_day(today,holidays,days=1):
     """
     Args:
     holidays:List Nse holidays
-    exclusions:List exclusions of the days
     days:int total days of bussiness
     Returns:
     Bussiness Day in format '%d-%b-%Y' 
@@ -38,14 +37,14 @@ def get_next_business_day(today,holidays,days=1):
     for i in range(1, days+1):
         if (
             ((today + timedelta(days=i)).strftime(DATE_FORMAT_B) not in [h['tradingDate'] for h in holidays])
-            and ((today + timedelta(days=i)).strftime('%A') not in exclusions)):
+            and ((today + timedelta(days=i)).strftime('%A') not in EXCLUSIONS)):
                 return (today + timedelta(days=i)).strftime(DATE_FORMAT_B)
+    return None
 
-def get_last_business_day(today,holidays,days=5)->datetime:
+def get_last_business_day(today,holidays,days=5):
     """
     Args:
     holidays:List Nse holidays
-    exclusions:List exclusions of the days
     days:int total days of bussiness
     Returns:
     Bussiness Day in format '%d-%b-%Y' 
@@ -53,8 +52,9 @@ def get_last_business_day(today,holidays,days=5)->datetime:
     for i in range(1,days+1):
         if (
             ((today - timedelta(days=i)).strftime(DATE_FORMAT_B) not in [h['tradingDate'] for h in holidays])
-            and ((today - timedelta(days=i)).strftime('%A') not in exclusions)):
+            and ((today - timedelta(days=i)).strftime('%A') not in EXCLUSIONS)):
                 return (today - timedelta(days=i))
+    return None
 
 def map_symbol_name(symbol):
     """
