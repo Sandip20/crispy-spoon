@@ -1,20 +1,23 @@
-# pylint: disable=broad-exception-caught
+# pylint: disable=broad-exception-caughtNSEDownloader
 """ 
 OptionWizard class  is main class which will  import neccessary modules and 
 calls respective methods
 """
 import asyncio
-from datetime import timedelta,datetime,date, timezone
-from dateutil.relativedelta import relativedelta
-import time
 import os
-from data.constants import DATE_FORMAT_B, MONTHS_IN_YEAR
+from datetime import timedelta,datetime,date
+import time
 import pandas as pd
-from data.mongodb import Mongo
 from dotenv import load_dotenv
+from pymongo import InsertOne
+from data.constants import  EXCLUSIONS
+from data.mongodb import Mongo
 from data.nse_downloader import NSEDownloader
 from data.process import ProcessData
-from data.util import data_frame_to_dict, get_last_business_day, get_week,get_strike
+from data.queries.mongo_queries_processed_options import create_find_cheapest_options_query
+from data.telegram import Telegram
+from data.util import data_frame_to_dict, get_last_business_day, get_next_business_day, get_week,get_strike
+
 load_dotenv()
 
 class OptionWizard:
@@ -27,10 +30,10 @@ class OptionWizard:
         base_url=f"mongodb+srv://{os.environ['MONGO_INITDB_ROOT_USERNAME']}:{os.environ['MONGO_INITDB_ROOT_PASSWORD']}@{os.environ['MONGO_INITDB_HOST']}"
         url= f"{base_url}:27017/?retryWrites=true&w=majority" if os.environ['MONGO_INITDB_HOST']=="localhost" else f"{base_url}/?retryWrites=true&w=majority"
         # connection with mongodb
-        print('url:',url)
         self.mongo=Mongo(url=url,db_name=os.environ['MONGO_INITDB_DATABASE'],is_ca_required=True)
-        self.nse_downloader= NSEDownloader()
-        self.process_data= ProcessData(self.nse_downloader,self.mongo)
+        self.nse_downloader = NSEDownloader()
+        self.process_data = ProcessData(self.nse_downloader,self.mongo)
+        self.telegram =Telegram(os.environ['TG_API_TOKEN'],os.environ['TG_CHAT_ID'])
         self.last_accessed_date_fut=self.get_last_accessed('fut')
         self.last_accessed_date_opt=self.get_last_accessed('opt')
         self.get_tickers()
@@ -199,6 +202,64 @@ class OptionWizard:
         except Exception as e:
             print(e)
             
+    def find_cheapest_options(self,n, input_date=None, no_of_days_back=False):
+
+        latest_doc = self.mongo.find_one(
+            filter={},
+            collection=os.environ['STRADDLE_COLLECTION_NAME'],
+            sort=[('Date', -1)])
+            
+        if latest_doc is None:
+            print('something wrong')
+            return
+        today = latest_doc['Date']
+        if input_date:
+            today = input_date
+        elif no_of_days_back:
+            today -= timedelta(days=no_of_days_back)
+        elif today.strftime('%A') in EXCLUSIONS:
+            days = EXCLUSIONS.index(today.strftime('%A')) + 1
+            today -= timedelta(days=days)
+        query = create_find_cheapest_options_query(today,n)
+        return {'day': today, 'cheapest_options': self.mongo.aggregate(query,os.environ['STRADDLE_COLLECTION_NAME'])}
+    
+    def get_trade_date(self,today):
+        holidays=self.nse_downloader.get_nse_holidays()
+        return get_next_business_day(today, holidays, days=5)
+
+    def send_to_telegram(self,cheapest_records,today):
+    
+        trade_date=self.get_trade_date(today)
+        self.telegram.send_to_telegram(cheapest_records,trade_date)
+
+    def update_record(self,record,columns,date_of_trade):
+
+        del record['Date']
+        del record['two_months_week_min_coverage']
+        del record['current_vs_prev_two_months']
+
+        symbol=record[columns[0]]
+        record['created_at']=date_of_trade
+        record['quantity']=symbol if symbol =="COFORGE" else self.lot_size[symbol]
+        record['price']= record[columns[2]]
+        return InsertOne(record)
+
+    def create_order(self,cheapest_stocks):
+        self.mongo.bulk_write(cheapest_stocks,os.environ['ORDERS_COLLECTION_NAME'])
+
+    def place_orders(self,cheapest_records,trade_date):
+        columns=['symbol',"strike",'straddle_premium',"%coverage"]
+        date_of_trade=pd.to_datetime(trade_date)
+        result =self.mongo.find_one({'created_at': date_of_trade},os.environ['ORDERS_COLLECTION_NAME'])
+        if result is not None:
+            return
+        # if(date_of_trade.strftime('%A') =="Tuesday"):
+            
+        cheapest_records=[self.update_record(record,columns,date_of_trade) for record in cheapest_records]
+        self.create_order(cheapest_records)
+        
+        print(date_of_trade.strftime('%A'))
+
     def update_daily(self):
         start_time = time.time()
         asyncio.run(self.update_futures_data()) 
