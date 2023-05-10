@@ -102,10 +102,10 @@ class Mongo:
             Dict[str, Any]: A dictionary that represents the matching document, or None if no documents match.
         """
         collection = self.db[collection]
-        print(len(filter))
+        
         return collection.find_one(filter,sort=sort) if len(filter)>0 else collection.find_one(sort=sort)
 
-    def find_many(self, filter: Dict[str, Any], collection: str) -> List[Dict[str, Any]]:
+    def find_many(self, filter: Dict[str, Any], collection: str,sort: Optional[List[Tuple[str, int]]] = None,limit=1000000) -> List[Dict[str, Any]]:
         """
         Finds multiple documents in the collection that match the specified filter.
 
@@ -118,7 +118,7 @@ class Mongo:
 
         collection = self.db[collection]
 
-        result = list(collection.find(filter))
+        result = list(collection.find(filter,sort=sort,limit=limit))
 
         return result
 

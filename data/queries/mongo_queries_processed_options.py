@@ -141,7 +141,7 @@ def create_find_cheapest_options_query(today:datetime,n:int)->List[Dict[str, Any
     return [
             {
                 '$match': {
-                    'Date': {'$gte': datetime(today.year, today.month, today.day, 0, 0, 0, tzinfo=timezone.utc)},
+                    'Date': datetime(today.year, today.month, today.day, 0, 0, 0, tzinfo=timezone.utc),
                     'two_months_week_min_coverage': {'$ne': float('nan')},
                     'current_vs_prev_two_months': {'$gte': -5, '$lte': 0},
                 }

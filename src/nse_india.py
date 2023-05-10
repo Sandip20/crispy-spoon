@@ -69,9 +69,10 @@ class NSE:
             'expiryDate': expiry_date.strftime(DATE_FORMAT_B)
         }
         if option_type in ['CE','PE']:
+            strike_price=f'{strike_price:.2f}'
             params.update({
                 'instrumentType': 'OPTSTK',
-                'strikePrice': strike_price,
+                'strikePrice':strike_price,
                 'optionType': option_type
             })
         else:
@@ -84,6 +85,7 @@ class NSE:
             self.request_count += 1
             response =  self.session.get(url, params=params, headers=self.headers)
             data = response.json()
+            print(response.url)
             if not data['data']:
                 return pd.DataFrame()
             df = pd.DataFrame(data['data'])

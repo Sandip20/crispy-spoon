@@ -3,6 +3,7 @@ Utility Module
 """
 from datetime import timedelta,datetime
 import pandas as pd
+from typing import Union
 
 from data.constants import DATE_FORMAT_B,EXCLUSIONS
 
@@ -26,7 +27,7 @@ def data_frame_to_dict(data_frame):
     data_frame['Expiry'] = pd.to_datetime(data_frame['Expiry'])
     return data_frame.to_dict('records')
 
-def get_next_business_day(today,holidays,days=1):
+def get_next_business_day(today,holidays,days=1)->Union[datetime,None]:
     """
     Args:
     holidays:List Nse holidays
@@ -41,7 +42,7 @@ def get_next_business_day(today,holidays,days=1):
                 return (today + timedelta(days=i)).strftime(DATE_FORMAT_B)
     return None
 
-def get_last_business_day(today,holidays,days=5):
+def get_last_business_day(today,holidays,days=5)->Union[datetime,None]:
     """
     Args:
     holidays:List Nse holidays
@@ -108,3 +109,60 @@ def get_week(days_to_expiry:int)->str:
     if days_to_expiry > -1:
         return 'week1'
     return 'expired'
+
+
+# Function to check if a given date is a holiday
+def is_holiday(today,holidays):
+  """
+    Checks if a given date is a holiday.
+
+    Parameters:
+    today (datetime.date): The date to check.
+    holidays (list of datetime.date): A list of holidays.
+
+    Returns:
+    bool: True if the date is a holiday, False otherwise.
+    """
+  return (today.strftime(DATE_FORMAT_B) in [h['tradingDate'] for h in holidays])
+
+# Function to add a given number of working days to a start date
+def add_working_days(start_date:datetime, num_days:int, holidays):
+        
+    """
+    Adds a given number of working days to a start date.
+
+    Parameters:
+    start_date (datetime.date): The start date.
+    num_days (int): The number of working days to add.
+    holidays (list of datetime.date): A list of holidays.
+
+    Returns:
+    datetime.date: The end date after adding the specified number of working days.
+    """
+    # Initialize variables
+    current_date = start_date
+    days_added = 0
+    
+    # Loop until the desired number of working days have been added
+    while days_added < num_days:
+        # Add one day to the current date
+        current_date += timedelta(days=1)
+        
+        # Check if the current date is a weekend or holiday
+        weekday = current_date.weekday()
+        if weekday >= 5 or is_holiday(current_date, holidays):
+            continue
+        
+        # If the current date is a working day, increment the days_added counter
+        days_added += 1
+    
+    # Return the end date
+    return current_date
+
+# # Example usage
+# start_date = datetime.date(2023, 5, 9)
+# num_days = 10
+# holidays = [datetime.date(2023, 5, 10), datetime.date(2023, 5, 14)]
+
+# end_date = add_working_days(start_date, num_days, holidays)
+# print(end_date)
