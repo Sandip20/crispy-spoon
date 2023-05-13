@@ -399,14 +399,22 @@ class OptionWizard:
                 records = data_frame_to_dict(data)
                 self.mongo.insert_many(
                     records, os.environ['OPTIONS_COLLECTION_NAME'])
+   
+    def get_portfolio_pnl(self, initial_capital: float) -> dict:
+        """
+        Returns the profit and loss (PNL) of the portfolio and the total capital used in the portfolio.
+        
+        Parameters:
+            initial_capital (float): The initial capital used to trade the portfolio.
+        
+        Returns:
+            portfolio_pnl (dict): A dictionary containing the portfolio's PNL, total capital, and symbol-wise PNL data.
+        """
 
-    def get_portfolio_pnl(self):
-        """
-        Returns the profit and loss (PNL) of the portfolio.
-        """
         portfolio_pnl = {
             'pnl': 0,
-            'total_capital': 0,
+            'total_capital': initial_capital,
+            'used_capital': 0,
             'symbols': {}
         }
 
@@ -441,16 +449,12 @@ class OptionWizard:
 
             portfolio_pnl['symbols'][symbol] = symbol_data
             portfolio_pnl['pnl'] += symbol_data['pnl']
-            portfolio_pnl['total_capital'] += symbol_data['capital']
-
-            print({
-                'Symbol': symbol,
-                'Strike Price': strike,
-                'pnl': symbol_data['pnl'],
-                'capital': symbol_data['capital']
-            })
+            portfolio_pnl['used_capital'] += symbol_data['capital']
+            portfolio_pnl['total_capital'] -= portfolio_pnl['used_capital']
+            print( portfolio_pnl['symbols'] )
 
         return portfolio_pnl
+
 
     def close_week_orders(self):
         """
