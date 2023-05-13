@@ -16,11 +16,9 @@ fo_mklots
 sos_schemes which contains strike information and lot size it will updated in to the collection stocks_step
 run this every quarter to keep updated files
 """
-# option_wizard.update_stocks_info()
 option_wizard.update_daily()
-# option_wizard.update_to_latest_v3()
 record = option_wizard.find_cheapest_options(n=15)
 option_wizard.send_to_telegram(record['cheapest_options'], record['day'])
-start_month_date = date(2023, 1, 1)
-end_month_date = date(2023, 5, 1)
+start_month_date = date(2022, 9, 1)
+end_month_date = date(2023, 5, 12)
 backtest_me(option_wizard, start_month_date, end_month_date)
