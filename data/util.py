@@ -5,6 +5,8 @@ from datetime import timedelta,datetime
 import pandas as pd
 from typing import Union
 
+from pymongo import InsertOne
+
 from data.constants import DATE_FORMAT_B,EXCLUSIONS
 
 def data_frame_to_dict(data_frame):
@@ -159,6 +161,28 @@ def add_working_days(start_date:datetime, num_days:int, holidays):
     # Return the end date
     return current_date
 
+def update_record(record: dict, columns: list, date_of_trade: datetime) -> InsertOne:
+    """
+    Update a record and return an instance of pymongo InsertOne.
+    
+    Args:
+    - record (dict): The record to be updated.
+    - columns (list): The list of columns for the record.
+    - date_of_trade (datetime): The date when the trade was made.
+    
+    Returns:
+    - pymongo.InsertOne: An instance of pymongo InsertOne.
+    """
+    # Delete unnecessary keys
+    del record['Date']
+    del record['two_months_week_min_coverage']
+    del record['current_vs_prev_two_months']
+
+    # Add created_at and price keys
+    record['created_at'] = date_of_trade
+    record['price'] = record[columns[2]]
+    
+    return InsertOne(record)
 # # Example usage
 # start_date = datetime.date(2023, 5, 9)
 # num_days = 10

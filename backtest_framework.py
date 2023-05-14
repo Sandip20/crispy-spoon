@@ -2,8 +2,8 @@ from datetime import timedelta,date
 from matplotlib import pyplot as plt
 from data.constants import CLOSE_POSITION_AFTER, NO_OF_TRADES
 from magic_engine import OptionWizard
-
-def backtest_strategy_mine(option_wizard:OptionWizard,start_month_date:date,end_month_date:date, initial_capital:float):
+initial_capital=400000
+def backtest_strategy_mine(option_wizard:OptionWizard,start_month_date:date,end_month_date:date):
     '''
     This function backtests a given option trading strategy.
 
@@ -20,7 +20,7 @@ def backtest_strategy_mine(option_wizard:OptionWizard,start_month_date:date,end_
     pnl_history = []
     trade_dates = []
     total_capital = initial_capital
-    
+
     while (end_month_date - current_date).days > 0:
         record = option_wizard.find_cheapest_options(n=NO_OF_TRADES, input_date=current_date, back_test=True)
         record['cheapest_options'] = [d for d in record['cheapest_options'] if d['expiry'] > d['Date']]
@@ -30,8 +30,8 @@ def backtest_strategy_mine(option_wizard:OptionWizard,start_month_date:date,end_
         
         trade_date = option_wizard.get_trade_date(record['day'])
         print(f"trade Date--------------{trade_date}------------")
-        option_wizard.place_orders(cheapest_records=record['cheapest_options'], trade_date=trade_date)
-        option_wizard.download_options_for_pnl(back_test=True)
+        option_wizard.order_manager.place_orders(cheapest_records=record['cheapest_options'], trade_date=trade_date)
+        option_wizard.fno_downloader.download_options_for_pnl()
         portfolio = option_wizard.get_portfolio_pnl(total_capital)
         
         if portfolio['total_capital'] > 0:
@@ -47,7 +47,7 @@ def backtest_strategy_mine(option_wizard:OptionWizard,start_month_date:date,end_
         else:
             pnl_history.append(0)
             
-        option_wizard.close_week_orders()
+        option_wizard.order_manager.close_week_orders()
         current_date = current_date + timedelta(days=CLOSE_POSITION_AFTER)
         
     total_profits = total_capital-initial_capital
@@ -61,5 +61,5 @@ def backtest_strategy_mine(option_wizard:OptionWizard,start_month_date:date,end_
     plt.show()
     
 def backtest_me(option_wizard:OptionWizard,start_month_date,end_month_date):
-     backtest_strategy_mine(option_wizard,start_month_date,end_month_date,500000.0)
+     backtest_strategy_mine(option_wizard,start_month_date,end_month_date)
      

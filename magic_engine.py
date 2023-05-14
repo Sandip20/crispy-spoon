@@ -10,14 +10,16 @@ import time
 from typing import Optional, Union
 import pandas as pd
 from dotenv import load_dotenv
-from pymongo import InsertOne
+
 from data.constants import EXCLUSIONS, NO_OF_WORKING_DAYS_END_CALCULATION
+from data.fno_downloader import FNODownloader
 from data.mongodb import Mongo
 from data.nse_downloader import NSEDownloader
+from data.order_manager import OrderManager
 from data.process import ProcessData
 from data.queries.mongo_queries_processed_options import create_find_cheapest_options_query
 from data.telegram import Telegram
-from data.util import add_working_days, data_frame_to_dict, get_last_business_day, get_next_business_day, get_week, get_strike, is_holiday
+from data.util import add_working_days, get_last_business_day, get_next_business_day, is_holiday
 
 load_dotenv()
 
@@ -39,10 +41,19 @@ class OptionWizard:
         self.process_data = ProcessData(self.nse_downloader, self.mongo)
         self.telegram = Telegram(
             os.environ['TG_API_TOKEN'], os.environ['TG_CHAT_ID'])
+      
         self.last_accessed_date_fut = self.get_last_accessed('fut')
         self.last_accessed_date_opt = self.get_last_accessed('opt')
         self.get_tickers()
         self.holidays = self.nse_downloader.get_nse_holidays()
+        self.fno_downloader = FNODownloader(
+            nse_downloader = self.nse_downloader,
+            mongo = self.mongo,
+            df_dict = self.df_dict,
+            tickers = self.tickers,
+            holidays=self.holidays
+            )
+        self.order_manager= OrderManager(mongo=self.mongo)
 
     def get_last_accessed(self, instrument: str) -> datetime.date:
         """
@@ -79,137 +90,6 @@ class OptionWizard:
         self.df_dict = df_dict
         self.lot_size = symbol_lot_details
         self.tickers = tickers
-
-    async def update_futures_data(self):
-        """
-        updates the futures data till date from last_accessed_date_fut inclusive
-        """
-        last_accessed_date_fut = self.last_accessed_date_fut
-
-        if pd.to_datetime(date.today()).date() == pd.to_datetime(last_accessed_date_fut).date():
-            print('Data is already updated')
-            return
-        start = pd.to_datetime(last_accessed_date_fut).date()
-        to_today = date.today()
-
-        expiry_date = self.nse_downloader.get_expiry(
-            start.year, start.month, start.day)
-        expiry_dates = [expiry_date]
-
-        if to_today > expiry_date:
-            new_date = expiry_date + timedelta(1)
-            expiry_date = self.nse_downloader.get_expiry(
-                new_date.year, new_date.month, new_date.day)
-            expiry_dates.append(expiry_date)
-        for idx, expiry_date in enumerate(expiry_dates):
-            if idx != 0:
-                start = expiry_dates[idx-1]
-                end_date = to_today
-            else:
-                end_date = expiry_date if to_today > expiry_date else to_today
-
-            tasks = []
-            for ticker in self.tickers:
-                tasks.append(asyncio.ensure_future(
-                    self._update_futures_data(ticker, start, end_date, expiry_date)))
-        await asyncio.gather(*tasks)
-
-    async def _update_futures_data(self, ticker, start, end, expiry_date):
-
-        """
-        event loop will call  _update_futures_data_v3 of nse_downloader.
-        download the data for given input mongo insertmany  to insert into  stock_futures
-        """
-        try:
-            ohlc_fut = await self.nse_downloader.update_futures_data(ticker, start, end, expiry_date)
-            if not ohlc_fut.empty:
-                data = data_frame_to_dict(ohlc_fut)
-                self.mongo.insert_many(data, 'stock_futures')
-        except Exception as e:
-            print(f"Error downloading Futures data for {ticker}: {e}")
-
-    async def _download_historical_options_v3(self, symbol: str, s_date, end_date: datetime, expiry_date, strike_price, fut_close, option_type):
-        """
-            symbol: str, 
-            s_date, 
-            end_date: datetime, 
-            expiry_date, 
-            strike_price, 
-            fut_close, 
-            option_type
-        """
-
-        try:
-            option_ohlc = await self.nse_downloader.download_historical_options(
-                symbol, s_date, end_date, expiry_date, strike_price, fut_close, option_type
-            )
-            option_ohlc['weeks_to_expiry'] = option_ohlc['days_to_expiry'].apply(
-                get_week)
-            self.mongo.insert_many(data_frame_to_dict(
-                option_ohlc), 'atm_stock_options')
-        except Exception as _e:
-            print(f"Error downloading Options data for {symbol}: {_e}")
-
-    async def download_historical_options(self, start_date, end_date, update_daily=True):
-        """
-            start_date: A datetime.date object representing the start date for which options data needs to be downloaded.
-            end_date: A datetime.date object representing the end date for which options data needs to be downloaded.
-            update_daily: A boolean value indicating whether to update daily data or not.
-        """
-        self.request_count = 2
-        ohlc_futures = []
-        if update_daily:
-            ohlc_futures = self.mongo.find_many(
-                {"Date": {"$gte": pd.to_datetime(self.last_accessed_date_opt)}
-                 },
-                'stock_futures'
-            )
-        else:
-            prev_month = start_date.month - 1 or 12
-            year = start_date.year - (prev_month == 12)
-
-            prev_expiry = self.nse_downloader.get_expiry(
-                year, prev_month) + pd.Timedelta(days=1)
-            holidays = self.nse_downloader.get_nse_holidays()
-            end_date = get_last_business_day(end_date, holidays)
-            expiry_next = self.nse_downloader.get_expiry(
-                end_date.year, end_date.month)
-            ohlc_futures = self.mongo.find_many(
-                {"Date": {"$gte": pd.to_datetime(
-                    prev_expiry), "$lte": pd.to_datetime(expiry_next)}},
-                'stock_futures'
-            )
-
-        step_dict = self.df_dict
-        tasks = []
-        filtered_ohlc_futures = [
-            record for record in ohlc_futures
-            if record['Symbol'] in self.tickers]
-
-        for ohlc_fut in filtered_ohlc_futures:
-            symbol = ohlc_fut["Symbol"]
-            step = step_dict[symbol]
-            expiry = ohlc_fut["Expiry"]
-            #all dates of current month
-            # get step of the sticker
-            s_date = ohlc_fut['Date']
-            close = float(ohlc_fut["Close"])
-            strike_price = get_strike(close, step)
-            for option_type in ["CE","PE"]:
-                tasks.append(asyncio.ensure_future(
-                    self._download_historical_options_v3(
-                        symbol,
-                        s_date,
-                        expiry,
-                        expiry,
-                        strike_price,
-                        float(ohlc_fut['Close']),
-                       option_type
-                    )))
-            if(self.request_count % 150 == 0):
-                await asyncio.sleep(5)
-            self.request_count += 2
-        await asyncio.gather(*tasks)
 
     def find_cheapest_options(
         self,
@@ -287,118 +167,6 @@ class OptionWizard:
         
         trade_date = self.get_trade_date(today)
         self.telegram.send_to_telegram(cheapest_records, trade_date)
-
-
-    def update_record(self, record: dict, columns: list, date_of_trade: datetime) -> InsertOne:
-        """
-        Update a record and return an instance of pymongo InsertOne.
-        
-        Args:
-        - record (dict): The record to be updated.
-        - columns (list): The list of columns for the record.
-        - date_of_trade (datetime): The date when the trade was made.
-        
-        Returns:
-        - pymongo.InsertOne: An instance of pymongo InsertOne.
-        """
-        # Delete unnecessary keys
-        del record['Date']
-        del record['two_months_week_min_coverage']
-        del record['current_vs_prev_two_months']
-
-        # Add created_at and price keys
-        record['created_at'] = date_of_trade
-        record['price'] = record[columns[2]]
-        
-        return InsertOne(record)
-
-
-    def create_order(self, cheapest_stocks):
-        """
-        Create orders for the given list of cheapest stocks.
-
-        Parameters:
-        -----------
-        cheapest_stocks : list of dict
-            List of cheapest stocks, where each item is a dictionary containing the following keys:
-            - Symbol : str
-            - Expiry : str
-            - Strike Price : float
-            - Option Type : str
-            - LTP : float
-            - Signal : str
-
-        Returns:
-        --------
-        None
-        """
-        self.mongo.bulk_write(
-            cheapest_stocks, os.environ['ORDERS_COLLECTION_NAME'])
-        
-    def place_orders(self, cheapest_records, trade_date):
-        """
-        This method places the orders for the cheapest_records.
-
-        Args:
-            cheapest_records (List[Dict]): A list of cheapest straddle options for each stock.
-            trade_date (str): The date on which the trade is to be placed.
-
-        Returns:
-            None
-        """
-        columns = ['symbol', "strike", 'straddle_premium', "%coverage"]
-        date_of_trade = pd.to_datetime(trade_date)
-
-        # Check if the order is already placed for the given trade date
-        result = self.mongo.find_one({'created_at': date_of_trade}, os.environ['ORDERS_COLLECTION_NAME'])
-        if result is not None:
-            return
-
-        # Update the records with created_at and price fields
-        cheapest_records = [self.update_record(record, columns, date_of_trade) for record in cheapest_records]
-
-        # Place the orders
-        self.create_order(cheapest_records)
-
-        print(date_of_trade.strftime('%A'))
-
-
-    def download_options_for_pnl(self, back_test=False):
-        """
-        download options for P&L
-        """
-
-        for order in self.mongo.find_many({}, os.environ['ORDERS_COLLECTION_NAME']):
-            if back_test:
-                end = add_working_days(
-                    order['created_at'], NO_OF_WORKING_DAYS_END_CALCULATION, self.holidays)
-                result = self.mongo.find_many(
-                    {'Symbol': order['symbol'], "Date": {"$gte": pd.to_datetime(order['created_at']), "$lte": pd.to_datetime(end)},
-                     'Strike Price': order['strike'], 'Expiry': order['expiry']}, os.environ['OPTIONS_COLLECTION_NAME'])
-                if len(result) > 0 and 'Lot_Size' in result[0]:
-                    continue
-                data = self.nse_downloader.get_oneday_options_history(
-                    ticker=order['symbol'],
-                    opt_type='CE',
-                    start_date=order['created_at'],
-                    end_date=end,
-                    expiry_date=order['expiry'],
-                    strike=order['strike']
-                )
-                records = data_frame_to_dict(data)
-                self.mongo.insert_many(
-                    records, os.environ['OPTIONS_COLLECTION_NAME'])
-                data = self.nse_downloader.get_oneday_options_history(
-                    ticker=order['symbol'],
-                    opt_type='PE',
-                    start_date=order['created_at'],
-                    end_date=end,
-                    expiry_date=order['expiry'],
-                    strike=order['strike']
-                )
-                records = data_frame_to_dict(data)
-                self.mongo.insert_many(
-                    records, os.environ['OPTIONS_COLLECTION_NAME'])
    
     def get_portfolio_pnl(self, initial_capital: float) -> dict:
         """
@@ -451,51 +219,9 @@ class OptionWizard:
             portfolio_pnl['pnl'] += symbol_data['pnl']
             portfolio_pnl['used_capital'] += symbol_data['capital']
             portfolio_pnl['total_capital'] -= portfolio_pnl['used_capital']
-            print( portfolio_pnl['symbols'] )
+            print(portfolio_pnl['symbols'][symbol] )
 
         return portfolio_pnl
-
-
-    def close_week_orders(self):
-        """
-        Closes all active orders for the current week. Retrieves the relevant option data from the database and calculates
-        the profit or loss made on the trades. Finally, inserts the details of the closed positions into a separate
-        collection and deletes the orders from the orders collection.
-
-        Returns:
-            None
-        """
-
-        for order in self.mongo.find_many({}, os.environ['ORDERS_COLLECTION_NAME']):
-            symbol = order['symbol']
-            strike = order['strike']
-            created_at = order['created_at']
-            entry_price = order['price']
-            query = {'Symbol': symbol, 'Strike Price': strike}
-            data = self.mongo.find_many(
-                query,
-                os.environ['OPTIONS_COLLECTION_NAME'],
-                sort=[('Date', -1)],
-                limit=2)
-            exit_price = round(
-                float(data[0]['Close']), 2)+round(float(data[1]['Close']), 2)
-
-            quantity = data[0]['Lot_Size']
-
-            position = {}
-            position['symbol'] = symbol
-            position['strike'] = strike
-            position['created_at'] = created_at
-            position['exit_date'] = data[0]['Date']
-            position['expiry'] = data[0]['Expiry']
-            position['entry_price'] = round(entry_price, 2)
-            position['exit_price'] = round(exit_price, 2)
-            position['margin'] = round(entry_price*quantity, 2)
-            position['profit_loss'] = round(
-                (exit_price - entry_price) * quantity, 2)
-            self.mongo.insert_one(
-                position, os.environ['CLOSED_POSITIONS_COLLECTION_NAME'])
-        self.mongo.delete_many({}, os.environ['ORDERS_COLLECTION_NAME'])
 
     def update_daily(self):
         """
@@ -505,7 +231,11 @@ class OptionWizard:
             None
         """
         start_time = time.time()
-        asyncio.run(self.update_futures_data())
+        if self.last_accessed_date_fut.strftime('%A') in EXCLUSIONS and date.today().strftime('%A') in EXCLUSIONS :
+            print(f"you are running script on sunday for which no data is available your recent update is on : {self.last_accessed_date_fut} ")
+            return
+        asyncio.run(
+            self.fno_downloader.update_futures_data(self.last_accessed_date_fut))
 
         end_time = time.time()
         execution_time = end_time - start_time
@@ -520,8 +250,10 @@ class OptionWizard:
         try:
             start_time = time.time()
             start_date = pd.to_datetime(date.today())
-            asyncio.run(self.download_historical_options(
-                start_date, start_date))
+            asyncio.run(
+            self.fno_downloader
+            .download_historical_options(start_date, start_date,self.last_accessed_date_opt)
+            )
             end_time = time.time()
             execution_time = end_time - start_time
             print(f"Execution time: {execution_time} seconds")

@@ -99,8 +99,7 @@ class NSEDownloader:
             expiry_date=current_month_expiry
         )
         return history
-    
-    async def _download_historical_futures_v3(self, ticker: str, year: int,
+    async def download_historical_futures(self, ticker: str, year: int,
                                               month: int) -> pd.DataFrame:
         """
         Download and insert historical futures data for a given ticker, year, and month.
@@ -195,7 +194,6 @@ class NSEDownloader:
             # self.stock_options.insert_many(self.data_frame_to_dict(opt_data))
         except requests.exceptions.RequestException as error:
             print(f"Error downloading Options data for {symbol} option Type:{type}: {error}")
-
     async def update_futures_data(self,ticker:str,start:datetime,end:datetime,expiry_date:datetime) ->pd.DataFrame :
         """
         Download historical futures data for a given ticker.
