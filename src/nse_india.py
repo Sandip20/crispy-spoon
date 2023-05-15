@@ -2,7 +2,7 @@
 # https://www.youtube.com/watch?v=dJPLfWXHupE&ab_channel=TradeViaPython
 import os
 import time
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 import requests
 import pandas as pd
 
@@ -150,9 +150,13 @@ class NSE:
             Exception: If the expiry date cannot be retrieved from the NSE website.
         """
         symbol = 'TATAMOTORS'
-        from_date = date(year, month, day).strftime(DATE_FORMAT)
+        input_date=date(year, month, day)
+        if input_date.strftime('%A')=='Saturday':
+          input_date-=timedelta(days=1)
+        elif input_date.strftime('%A')=='Sunday':
+            input_date-=timedelta(days=2)
+        from_date = input_date.strftime(DATE_FORMAT)
         to_date = date.today().strftime(DATE_FORMAT)
-
         url = f'{NSE_HOST}/api/historical/fo/derivatives/meta?from={from_date}&to={to_date}&instrumentType=FUTSTK&symbol={symbol}'
         try:
             response = self.session.get(url, headers=self.headers)
