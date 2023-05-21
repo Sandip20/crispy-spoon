@@ -168,7 +168,7 @@ class OptionWizard:
         trade_date = self.get_trade_date(today)
         self.telegram.send_to_telegram(cheapest_records, trade_date)
    
-    def get_portfolio_pnl(self, initial_capital: float) -> dict:
+    def get_portfolio_pnl(self, initial_capital:float,slippage:float,brokerage:float) -> dict:
         """
         Returns the profit and loss (PNL) of the portfolio and the total capital used in the portfolio.
         
@@ -205,6 +205,14 @@ class OptionWizard:
             current_price = float(data[0]['Close']) + float(data[1]['Close'])
             quantity = data[0]['Lot_Size']
 
+            # Calculate slippage and brokerages
+            slippage_cost=slippage*quantity
+            brokerage_cost=brokerage
+
+            print(slippage_cost,brokerage_cost)
+
+            # Calculate PNL considering slippage and brokerages
+            pnl=(current_price - price) * quantity - (slippage_cost+ brokerage_cost)
             symbol_data = {
                 'quantity': quantity,
                 'strike': strike,
@@ -212,14 +220,14 @@ class OptionWizard:
                 'buy_price': price,
                 'current_price': current_price,
                 'capital': round(price * quantity, 2),
-                'pnl': round((current_price - price) * quantity, 2)
+                'pnl': round(pnl, 2)
             }
 
             portfolio_pnl['symbols'][symbol] = symbol_data
             portfolio_pnl['pnl'] += symbol_data['pnl']
             portfolio_pnl['used_capital'] += symbol_data['capital']
             portfolio_pnl['total_capital'] -= portfolio_pnl['used_capital']
-            print(portfolio_pnl['symbols'][symbol] )
+            print(f'{symbol}:',portfolio_pnl['symbols'][symbol] )
 
         return portfolio_pnl
 
