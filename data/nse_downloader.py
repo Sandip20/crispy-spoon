@@ -185,7 +185,7 @@ class NSEDownloader:
             opt_data = await loop.run_in_executor(None, self.get_oneday_options_history, symbol,
                                                   option_type, s_date,
                                                   end_date, expiry_date, strike_price)
-            opt_data['days_to_expiry'] = (end_date - s_date).days
+            opt_data['days_to_expiry'] = (expiry_date - s_date).days
             opt_data['fut_close'] = fut_close
             return opt_data
 

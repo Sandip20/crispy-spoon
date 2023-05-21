@@ -156,17 +156,20 @@ class NSE:
         elif input_date.strftime('%A')=='Sunday':
             input_date-=timedelta(days=2)
         from_date = input_date.strftime(DATE_FORMAT)
-        to_date = date.today().strftime(DATE_FORMAT)
-        url = f'{NSE_HOST}/api/historical/fo/derivatives/meta?from={from_date}&to={to_date}&instrumentType=FUTSTK&symbol={symbol}'
+        to_date = from_date
+        # date.today().strftime(DATE_FORMAT)
+        url = f'{NSE_HOST}/api/historical/fo/derivatives/meta?from={from_date}&to={from_date}&instrumentType=FUTSTK&symbol={symbol}'
         try:
             response = self.session.get(url, headers=self.headers)
             response.raise_for_status()
             json_data = response.json()
-            for exp_date in json_data['years'][to_date.split('-')[2]]:
-                if datetime.strptime(exp_date, DATE_FORMAT_B).date() >= datetime.strptime(from_date, DATE_FORMAT).date():
-                    date_string = exp_date
-                    break
-            return datetime.strptime(date_string, DATE_FORMAT_B).date()
+           
+            return datetime.strptime(json_data['years'][to_date.split('-')[2]][0], DATE_FORMAT_B).date()
+            # for exp_date in json_data['years'][to_date.split('-')[2]]:
+            #     if datetime.strptime(exp_date, DATE_FORMAT_B).date() >= datetime.strptime(from_date, DATE_FORMAT).date():
+            #         date_string = exp_date
+            #         break
+            # return datetime.strptime(date_string, DATE_FORMAT_B).date()
 
         except (requests.exceptions.HTTPError, KeyError, IndexError, ValueError) as error:
             raise Exception('Could not get expiry date from NSE website.') from error

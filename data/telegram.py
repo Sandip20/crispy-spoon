@@ -64,4 +64,3 @@ class Telegram:
         send_text = 'https://api.telegram.org/bot'+self.tg_api_token + \
             '/sendMessage?chat_id='+self.tg_chat_id+'&parse_mode=html&text='+bot_message
         response = requests.get(send_text)
-        print(response.text)

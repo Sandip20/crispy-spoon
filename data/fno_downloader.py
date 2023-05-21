@@ -5,10 +5,12 @@ Module responsible for downloading the F&O data
 import os
 import asyncio
 from datetime import timedelta, date, datetime
+import time
 
 from typing import List
 import pandas as pd
-from data.constants import NO_OF_WORKING_DAYS_END_CALCULATION
+from dateutil.relativedelta import relativedelta
+from data.constants import MONTHS_IN_YEAR, NO_OF_WORKING_DAYS_END_CALCULATION
 from data.util import add_working_days, data_frame_to_dict, get_last_business_day, get_strike, get_week
 from data.mongodb import Mongo
 from data.nse_downloader import NSEDownloader
@@ -132,8 +134,11 @@ class FNODownloader:
 
             prev_expiry = self.nse_downloader.get_expiry(
                 year, prev_month) + pd.Timedelta(days=1)
-            holidays = self.nse_downloader.get_nse_holidays()
-            end_date = get_last_business_day(end_date, holidays)
+            
+            if last_accessed_date_opt is not None:
+                holidays = self.nse_downloader.get_nse_holidays()
+                end_date = get_last_business_day(end_date, holidays)
+
             expiry_next = self.nse_downloader.get_expiry(
                 end_date.year, end_date.month)
             ohlc_futures = self.mongo.find_many(
@@ -161,7 +166,7 @@ class FNODownloader:
                     self._download_historical_options_v3(
                         symbol,
                         s_date,
-                        expiry,
+                        s_date,
                         expiry,
                         strike_price,
                         float(ohlc_fut['Close']),
@@ -172,28 +177,6 @@ class FNODownloader:
             request_count += 2
         await asyncio.gather(*tasks)
 
-    async def download_historical_futures_monthly(self, symbol: str, year: int, month: int):
-        """
-        Downloads historical futures data for a given symbol, year, and month from the NSE and saves it to a MongoDB database.
-
-        Parameters:
-        -----------
-        symbol : str
-            The symbol for which to download historical futures data.
-        year : int
-            The year for which to download historical futures data.
-        month : int
-            The month for which to download historical futures data.
-
-        Returns:
-        --------
-        data : pd.DataFrame
-            A pandas DataFrame containing the downloaded historical futures data.
-        """
-        ohlc_fut: pd.DataFrame = await self.nse_downloader.download_historical_futures(symbol, year, month)
-        #  data_frame_to_dict(ohlc_fut)
-        #     # if not ohlc_fut.empty and (data[0]["Symbol"] in self.df_dict or ticker == self.map_symbol_name(data[0]["Symbol"])):
-        #     #     self.stock_futures.insert_many(data)
     def download_options_for_pnl(self):
         """
         download options for P&L
@@ -229,3 +212,67 @@ class FNODownloader:
             records = data_frame_to_dict(data)
             self.mongo.insert_many(
                 records, os.environ['OPTIONS_COLLECTION_NAME'])
+            
+    
+    async def _download_historical_futures(self,ticker,year,month):
+        try:
+            print(f'{ticker} is processing ')
+            ohlc_fut = await asyncio.get_event_loop().run_in_executor(None, self.nse_downloader.get_month_fut_history, ticker, year,month)
+            data=data_frame_to_dict(ohlc_fut)
+            if not ohlc_fut.empty:
+                self.mongo.insert_many(data, 'stock_futures')
+        except Exception as _e:
+            print(f"Error downloading Futures data for {ticker}: {_e}")
+   
+    async def download_historical_futures(self, start_date: date, end_date: date) -> None:
+        """Downloads historical futures data for the given tickers between start_date and end_date.
+
+        Args:
+            start_date (date): The start date for downloading historical data.
+            end_date (date): The end date for downloading historical data.
+
+        Returns:
+            None: The function does not return anything, but downloads the historical data for the given tickers and time period.
+
+        """
+        tickers = self.tickers
+        tasks = []
+        while start_date <= end_date:
+        
+            previous_month_number = (MONTHS_IN_YEAR if start_date.month == 1 else start_date.month - 1)
+            if previous_month_number == MONTHS_IN_YEAR:
+                previous_expiry = self.nse_downloader.get_expiry(start_date.year - 1, previous_month_number)
+            else:
+                previous_expiry = self.nse_downloader.get_expiry(start_date.year, previous_month_number)
+
+            # Add one day to make it the start of the contract for the current month
+            current_month_expiry = self.nse_downloader.get_expiry(start_date.year, start_date.month)
+            current_month_start = previous_expiry + timedelta(days=1)
+            for ticker in tickers:
+                tasks.append(asyncio.create_task(
+                    self._update_futures_data(ticker, current_month_start, current_month_expiry, current_month_expiry)
+                    # self._download_historical_futures(ticker, start_date.year, start_date.month,)
+                    ))
+            start_date += relativedelta(months=1)
+        await asyncio.gather(*tasks)
+        print('Download completed.')
+
+    def download_historical(self,start_date,end_date):
+        """
+        start_date:datetime,
+        end_date:datetime
+        """
+        start_time = time.time()
+        asyncio.run(self.download_historical_futures(start_date,end_date)) 
+        end_time = time.time()
+        execution_time = end_time - start_time
+        
+        print(f"Execution time to download futures: {execution_time} seconds")
+        start_time = time.time()
+        asyncio.run(self.download_historical_options(start_date, start_date,None,False))
+        end_time = time.time()
+        execution_time = end_time - start_time
+        print(f"Execution time to downdload Options: {execution_time} seconds")
+        # self. update_security_names()
+
+
