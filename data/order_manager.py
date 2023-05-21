@@ -1,3 +1,4 @@
+# pylint: disable=bad-indentation
 import os
 
 import pandas as pd
@@ -64,6 +65,13 @@ class OrderManager:
         self.create_order(cheapest_records)
 
         print(date_of_trade.strftime('%A'))
+
+    def clear_existing_trades(self):
+        """
+
+        clears all the trades 
+        """
+        self.mongo.delete_many({},os.environ['CLOSED_POSITIONS_COLLECTION_NAME'])
     def close_week_orders(self):
         """
         Closes all active orders for the current week. Retrieves the relevant option data from the database and calculates
