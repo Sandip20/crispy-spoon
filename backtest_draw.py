@@ -4,7 +4,9 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from dotenv import load_dotenv
 from pymongo import MongoClient
-
+initial_capital = 400000
+brokerage = 200
+slippage = 0.01
 load_dotenv()
 base_url = f"mongodb+srv://{os.environ['MONGO_INITDB_ROOT_USERNAME']}:{os.environ['MONGO_INITDB_ROOT_PASSWORD']}@{os.environ['MONGO_INITDB_HOST']}"
 client=MongoClient(base_url)
@@ -43,15 +45,16 @@ pipeline = [
 ]
 result=closed_order.aggregate(pipeline)
 data=list(result)
+# total_capital=initial_capital
 # Extract relevant data for PNL chart
 dates = [data_point['exit_date'] for data_point in data]
 pnl = [ data_point['profit_loss'] for data_point in data]
 
 pnl_cumsum = [sum(pnl[:i + 1]) for i in range(len(pnl))]
-# Plot the PNL chart
 
 fig,(ax1,ax2)=plt.subplots(2,1,figsize=(10,8),sharex=True)
-ax1.plot(dates,pnl_cumsum,marker='o')
+ax1.plot(dates,pnl_cumsum,'g',lw=1.5,marker='o')
+ax1.plot(dates,pnl_cumsum,'ro')
 ax1.set_xlabel('Date')
 ax1.set_ylabel('PNL')
 ax1.set_title('Profit and Loss Chart')
@@ -60,9 +63,9 @@ ax1.grid()
 
 pnl_cumsum_series=pd.Series(pnl_cumsum)
 drawdown = pnl_cumsum_series - pnl_cumsum_series.cummax()
-
+ax1.plot(dates, drawdown,'r',lw=1.5,marker='o')
 # Plot the drawdown chart
-ax2.plot(dates, drawdown)
+ax2.bar(dates, drawdown,width=2,color="r")
 ax2.set_xlabel('Date')
 ax2.set_ylabel('Drawdown')
 ax2.set_title('Drawdown Chart')

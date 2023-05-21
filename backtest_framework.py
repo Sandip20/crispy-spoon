@@ -24,7 +24,7 @@ def backtest_strategy_mine(option_wizard: OptionWizard, start_month_date: date, 
     pnl_history = []
     trade_dates = []
     total_capital = initial_capital
-
+    option_wizard.order_manager.clear_existing_trades()
     while (end_month_date - current_date).days > 0:
         record = option_wizard.find_cheapest_options(
             n=NO_OF_TRADES, input_date=current_date, back_test=True)
@@ -55,7 +55,7 @@ def backtest_strategy_mine(option_wizard: OptionWizard, start_month_date: date, 
 
         else:
             pnl_history.append(0)
-
+     
         option_wizard.order_manager.close_week_orders()
 
         # next_position = CLOSE_POSITION_AFTER if i%2 != 0 else CLOSE_POSITION_AFTER/2
