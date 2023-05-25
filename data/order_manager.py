@@ -3,7 +3,7 @@ import os
 
 import pandas as pd
 from data.mongodb import Mongo
-from data.util import update_record
+from data.util import find_available_trade_exit, update_record
 
 class OrderManager:
     """Class to manage orders for a trading system."""
@@ -87,17 +87,21 @@ class OrderManager:
             strike = order['strike']
             created_at = order['created_at']
             entry_price = order['price']
-            query = {'Symbol': symbol, 'Strike Price': strike}
+            query = {'Symbol': symbol, 'Strike Price': strike,'Expiry':order['expiry']}
             data = self.mongo.find_many(
                 query,
                 os.environ['OPTIONS_COLLECTION_NAME'],
                 sort=[('Date', -1)],
-                limit=2)
+                limit=10)
             exit_price = round(
                 float(data[0]['Close']), 2)+round(float(data[1]['Close']), 2)
 
             quantity = data[0]['Lot_Size']
+            """
+            find the  options data date and expiry date difference is 6 or 5 or 4 whichever is available at the top
+            """
 
+            # filtered=filter(find_available_trade_exit,data,order['expiry'])
             position = {}
             position['symbol'] = symbol
             position['strike'] = strike

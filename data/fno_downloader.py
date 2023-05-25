@@ -185,9 +185,18 @@ class FNODownloader:
         for order in self.mongo.find_many({}, os.environ['ORDERS_COLLECTION_NAME']):
             end = add_working_days(
                 order['created_at'], NO_OF_WORKING_DAYS_END_CALCULATION, self.holidays)
-            result = self.mongo.find_many(
-                {'Symbol': order['symbol'], "Date": {"$gte": pd.to_datetime(order['created_at']), "$lte": pd.to_datetime(end)},
-                    'Strike Price': order['strike'], 'Expiry': order['expiry']}, os.environ['OPTIONS_COLLECTION_NAME'])
+            query = {
+                'Symbol': order['symbol'],
+                "Date":pd.to_datetime(end),
+                #    "Date": {
+                #     "$gte": pd.to_datetime(order['created_at']),
+                #     "$lte": pd.to_datetime(end)
+                # },
+                'Strike Price': order['strike'],
+                'Expiry': order['expiry']
+            }
+            result = self.mongo.find_many(query
+                , os.environ['OPTIONS_COLLECTION_NAME'])
             if len(result) > 0 and 'Lot_Size' in result[0]:
                 continue
             data = self.nse_downloader.get_oneday_options_history(

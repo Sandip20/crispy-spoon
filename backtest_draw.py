@@ -2,6 +2,7 @@ import os
 from datetime import date
 import matplotlib.pyplot as plt
 import pandas as pd
+import numpy as np
 from dotenv import load_dotenv
 from pymongo import MongoClient
 initial_capital = 400000
@@ -45,29 +46,32 @@ pipeline = [
 ]
 result=closed_order.aggregate(pipeline)
 data=list(result)
-# total_capital=initial_capital
+total_capital=initial_capital
 # Extract relevant data for PNL chart
 dates = [data_point['exit_date'] for data_point in data]
+
 pnl = [ data_point['profit_loss'] for data_point in data]
 
-pnl_cumsum = [sum(pnl[:i + 1]) for i in range(len(pnl))]
-
-fig,(ax1,ax2)=plt.subplots(2,1,figsize=(10,8),sharex=True)
-ax1.plot(dates,pnl_cumsum,'g',lw=1.5,marker='o')
-ax1.plot(dates,pnl_cumsum,'ro')
+# pnl_cumsum = [sum(pnl[:i + 1]) for i in range(len(pnl))]
+pnl_cumsum=np.cumsum(pnl).tolist()
+print(f"total_profit or loss:{pnl}")
+fig,(ax1,ax2)=plt.subplots(2,1,figsize=(15,8),sharex=True)
+ax1.plot(dates,pnl_cumsum,lw=1.5)
+# ax1.plot(dates,pnl_cumsum,'ro')
 ax1.set_xlabel('Date')
 ax1.set_ylabel('PNL')
-ax1.set_title('Profit and Loss Chart')
+ax1.set_title('Profit and Loss')
 
-ax1.grid()
+# ax1.grid()
 
 pnl_cumsum_series=pd.Series(pnl_cumsum)
 drawdown = pnl_cumsum_series - pnl_cumsum_series.cummax()
-ax1.plot(dates, drawdown,'r',lw=1.5,marker='o')
+# ax1.plot(dates, drawdown,'r',lw=1.5,marker='o')
 # Plot the drawdown chart
-ax2.bar(dates, drawdown,width=2,color="r")
+# ax2.bar(dates, drawdown,width=2,color="r")
+ax2.plot(dates, drawdown,'r',lw=1.5)
 ax2.set_xlabel('Date')
 ax2.set_ylabel('Drawdown')
-ax2.set_title('Drawdown Chart')
-plt.tight_layout()
+ax2.set_title('Drawdown')
+# plt.tight_layout()
 plt.show()
