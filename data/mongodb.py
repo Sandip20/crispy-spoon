@@ -188,3 +188,11 @@ class Mongo:
         """
         collection = self.db[collection]
         return collection.bulk_write(bulk_operations)
+    
+    def distinct(self,field,query,collection: str) -> List[Dict[str, Any]]:
+        """
+        get distinct records
+        """
+        collection = self.db[collection]
+        return list(collection.distinct(field,query))
+                                                             

@@ -16,7 +16,7 @@ closed_order=db[os.environ['CLOSED_POSITIONS_COLLECTION_NAME']]
 
 
 start_date=date(2022,10,1)
-end_date=date(2023,5,20)
+end_date=date(2023,5,25)
 pipeline = [
     {
         "$match": {
@@ -54,7 +54,7 @@ pnl = [ data_point['profit_loss'] for data_point in data]
 
 # pnl_cumsum = [sum(pnl[:i + 1]) for i in range(len(pnl))]
 pnl_cumsum=np.cumsum(pnl).tolist()
-print(f"total_profit or loss:{pnl}")
+print(f"total_profit or loss:{sum(pnl)}")
 fig,(ax1,ax2)=plt.subplots(2,1,figsize=(15,8),sharex=True)
 ax1.plot(dates,pnl_cumsum,lw=1.5)
 # ax1.plot(dates,pnl_cumsum,'ro')

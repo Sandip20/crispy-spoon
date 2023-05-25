@@ -72,7 +72,7 @@ class OrderManager:
         clears all the trades 
         """
         self.mongo.delete_many({},os.environ['CLOSED_POSITIONS_COLLECTION_NAME'])
-    def close_week_orders(self):
+    def close_week_orders(self,orders_dict):
         """
         Closes all active orders for the current week. Retrieves the relevant option data from the database and calculates
         the profit or loss made on the trades. Finally, inserts the details of the closed positions into a separate
@@ -81,38 +81,15 @@ class OrderManager:
         Returns:
             None
         """
-
-        for order in self.mongo.find_many({}, os.environ['ORDERS_COLLECTION_NAME']):
-            symbol = order['symbol']
-            strike = order['strike']
-            created_at = order['created_at']
-            entry_price = order['price']
-            query = {'Symbol': symbol, 'Strike Price': strike,'Expiry':order['expiry']}
-            data = self.mongo.find_many(
-                query,
-                os.environ['OPTIONS_COLLECTION_NAME'],
-                sort=[('Date', -1)],
-                limit=10)
-            exit_price = round(
-                float(data[0]['Close']), 2)+round(float(data[1]['Close']), 2)
-
-            quantity = data[0]['Lot_Size']
-            """
-            find the  options data date and expiry date difference is 6 or 5 or 4 whichever is available at the top
-            """
-
-            # filtered=filter(find_available_trade_exit,data,order['expiry'])
-            position = {}
-            position['symbol'] = symbol
-            position['strike'] = strike
-            position['created_at'] = created_at
-            position['exit_date'] = data[0]['Date']
-            position['expiry'] = data[0]['Expiry']
-            position['entry_price'] = round(entry_price, 2)
-            position['exit_price'] = round(exit_price, 2)
-            position['margin'] = round(entry_price*quantity, 2)
-            position['profit_loss'] = round(
-                (exit_price - entry_price) * quantity, 2)
-            self.mongo.insert_one(
-                position, os.environ['CLOSED_POSITIONS_COLLECTION_NAME'])
+        positions=[]
+        for order in  orders_dict.values():
+            position = {
+                **order,
+                'profit_loss':order['pnl'],
+                'margin':order['capital'],
+                'exit_price':order['current_price']
+                }
+            positions.append(position)
+        self.mongo.insert_many(positions, os.environ['CLOSED_POSITIONS_COLLECTION_NAME'])
         self.mongo.delete_many({}, os.environ['ORDERS_COLLECTION_NAME'])
+        
