@@ -196,6 +196,12 @@ class OptionWizard:
 
             end = add_working_days(
                 created_at, NO_OF_WORKING_DAYS_END_CALCULATION, self.holidays)
+            
+            one_day_before= pd.to_datetime(date.today())-timedelta(days=1)
+            if end > one_day_before:
+                end =one_day_before
+        
+
             data = self.mongo.find_many(
                 {'Symbol': symbol, 'Strike Price': strike, 'Date': {'$lte': end}},
                 os.environ['OPTIONS_COLLECTION_NAME'],

@@ -185,9 +185,13 @@ class FNODownloader:
         for order in self.mongo.find_many({}, os.environ['ORDERS_COLLECTION_NAME']):
             end = add_working_days(
                 order['created_at'], NO_OF_WORKING_DAYS_END_CALCULATION, self.holidays)
+          
+            one_day_before= pd.to_datetime(date.today())-timedelta(days=1)
+            if end > one_day_before:
+                end =one_day_before
             query = {
                 'Symbol': order['symbol'],
-                "Date":pd.to_datetime(end),
+                "Date":end,
                 #    "Date": {
                 #     "$gte": pd.to_datetime(order['created_at']),
                 #     "$lte": pd.to_datetime(end)
