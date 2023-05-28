@@ -82,16 +82,21 @@ class FNODownloader:
         except Exception as _e:
             print(f"Error downloading Options data for {symbol}: {_e}")
 
-    async def update_futures_data(self, last_accessed_date_fut):
+    async def update_futures_data(self, last_accessed_date_fut,start_date,end_date):
         """
         updates the futures data till date from last_accessed_date_fut inclusive
         """
-        if pd.to_datetime(date.today()).date() == pd.to_datetime(last_accessed_date_fut).date():
-            print('Data is already updated')
-            return
-        start = pd.to_datetime(last_accessed_date_fut).date()
-        to_today = date.today()
-
+        if start_date and end_date :
+            start=start_date
+            to_today=end_date
+        else:
+            if pd.to_datetime(date.today()).date() == pd.to_datetime(last_accessed_date_fut).date():
+                print('Data is already updated')
+                return
+            else:
+                start = pd.to_datetime(last_accessed_date_fut).date()
+                to_today = date.today()
+  
         expiry_date = self.nse_downloader.get_expiry(
             start.year, start.month, start.day)
         expiry_dates = [expiry_date]
@@ -114,7 +119,7 @@ class FNODownloader:
                     self._update_futures_data(ticker, start, end_date, expiry_date)))
         await asyncio.gather(*tasks)
 
-    async def download_historical_options(self, start_date, end_date, last_accessed_date_opt, update_daily=True):
+    async def download_historical_options(self, start_date, end_date, last_accessed_date_opt, update_daily=True,update_date_wise=False):
         """
             start_date: A datetime.date object representing the start date for which options data needs to be downloaded.
             end_date: A datetime.date object representing the end date for which options data needs to be downloaded.
@@ -128,6 +133,19 @@ class FNODownloader:
                  },
                 'stock_futures'
             )
+
+        if update_date_wise:
+
+            ohlc_futures = self.mongo.find_many(
+            {
+                "Date": {
+                    "$gte": pd.to_datetime(start_date),
+                    "$lte":pd.to_datetime(end_date)
+                    }
+            },
+            'stock_futures'
+        )
+
         else:
             prev_month = start_date.month - 1 or 12
             year = start_date.year - (prev_month == 12)
@@ -172,6 +190,7 @@ class FNODownloader:
                         float(ohlc_fut['Close']),
                         option_type
                     )))
+            
             if(request_count % 150 == 0):
                 await asyncio.sleep(5)
             request_count += 2
@@ -284,7 +303,7 @@ class FNODownloader:
         
         print(f"Execution time to download futures: {execution_time} seconds")
         start_time = time.time()
-        asyncio.run(self.download_historical_options(start_date, start_date,None,False))
+        asyncio.run(self.download_historical_options(start_date, start_date,None,False,True))
         end_time = time.time()
         execution_time = end_time - start_time
         print(f"Execution time to downdload Options: {execution_time} seconds")
