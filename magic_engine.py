@@ -197,9 +197,9 @@ class OptionWizard:
             end = add_working_days(
                 created_at, NO_OF_WORKING_DAYS_END_CALCULATION, self.holidays)
             
-            one_day_before= pd.to_datetime(date.today())-timedelta(days=1)
+            one_day_before = pd.to_datetime(date.today())-timedelta(days=1)
             if end > one_day_before:
-                end =one_day_before
+                end = one_day_before
         
 
             data = self.mongo.find_many(
@@ -215,25 +215,27 @@ class OptionWizard:
             slippage_cost=slippage*quantity
             brokerage_cost=brokerage
 
-            print(slippage_cost,brokerage_cost)
+            # print(slippage_cost,brokerage_cost)
 
             # Calculate PNL considering slippage and brokerages
             pnl=(current_price - price) * quantity - (slippage_cost+ brokerage_cost)
             symbol_data = {
+                'symbol':symbol,
                 'quantity': quantity,
                 'strike': strike,
                 'created_at': created_at,
                 'buy_price': price,
                 'current_price': current_price,
                 'capital': round(price * quantity, 2),
-                'pnl': round(pnl, 2)
+                'pnl': round(pnl, 2),
+                'expiry':data[0]['Expiry'],
+                'exit_date':data[0]['Date']
             }
 
             portfolio_pnl['symbols'][symbol] = symbol_data
             portfolio_pnl['pnl'] += symbol_data['pnl']
             portfolio_pnl['used_capital'] += symbol_data['capital']
             portfolio_pnl['total_capital'] -= portfolio_pnl['used_capital']
-            print(f'{symbol}:',portfolio_pnl['symbols'][symbol] )
 
         return portfolio_pnl
 
@@ -249,7 +251,7 @@ class OptionWizard:
             print(f"you are running script on sunday for which no data is available your recent update is on : {self.last_accessed_date_fut} ")
             return
         asyncio.run(
-            self.fno_downloader.update_futures_data(self.last_accessed_date_fut))
+            self.fno_downloader.update_futures_data(self.last_accessed_date_fut,None,None))
 
         end_time = time.time()
         execution_time = end_time - start_time
@@ -279,11 +281,14 @@ class OptionWizard:
             )
         except Exception as _e:
             print(f"An error occurred while downloading historical options: {_e}")
-
+        
+        start_date = pd.to_datetime(date.today())
         self.process_data.add_ce_pe_of_same_date(
             start_date=start_date, end_date=start_date)
         print('data processing')
-        self.process_data.update_week_min_coverage()
         self.process_data.update_current_vs_prev_two_months(
             today=True).to_csv('current.csv')
         print('CSV generated')
+
+    def download_historical(self,start_date,end_date):
+        self.fno_downloader.download_historical(start_date,end_date)
