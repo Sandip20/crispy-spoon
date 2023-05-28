@@ -279,16 +279,16 @@ class ProcessData:
 
         """
         new_date = today-relativedelta(months=1)
-        prev_one_month_expiry = self.nse_downloader.get_expiry(
-            new_date.year, new_date.month)
+        prev_one_month_expiry = self.get_month_expiry(new_date)
         new_date = today-relativedelta(months=3)
-        prev_second_month_expiry = self.nse_downloader.get_expiry(
-            new_date.year, new_date.month)
+        prev_second_month_expiry = self.get_month_expiry(new_date)
         return pd.DataFrame(self.mongo.find_many({
-            "Expiry": {
-                "$lte": pd.to_datetime(prev_one_month_expiry),
-                "$gt": pd.to_datetime(prev_second_month_expiry),
-            }
+            "Expiry":{
+                "$in":[
+                    pd.to_datetime(prev_one_month_expiry),
+                    pd.to_datetime(prev_second_month_expiry)
+                    ]
+                }
         }, os.environ['STRADDLE_COLLECTION_NAME']))
 
     def get_month_expiry(self, end_date: datetime):
@@ -348,9 +348,12 @@ class ProcessData:
         if today:
             current_expiry = self.get_month_expiry(date.today())
             current_month = self.get_current_month_data(current_expiry)
-            print('current-month', current_month.columns)
+           
 
             last_two_months = self.get_last_two_months_data(current_expiry)
+            expiry_mask=last_two_months['Expiry'] != pd.Timestamp(current_expiry)
+            last_two_months = last_two_months[expiry_mask]
+
             current_month = process_monthly_data(
                 current_month=current_month, last_two_months=last_two_months)
             mask = current_month["current_vs_prev_two_months"] > -5
