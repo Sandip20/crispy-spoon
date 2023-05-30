@@ -128,13 +128,14 @@ class FNODownloader:
         request_count = 2
         ohlc_futures = []
         if update_daily:
+
             ohlc_futures = self.mongo.find_many(
                 {"Date": {"$gte": pd.to_datetime(last_accessed_date_opt)}
                  },
                 'stock_futures'
             )
 
-        if update_date_wise:
+        elif update_date_wise:
 
             ohlc_futures = self.mongo.find_many(
             {

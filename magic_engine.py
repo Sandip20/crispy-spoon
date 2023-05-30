@@ -215,7 +215,6 @@ class OptionWizard:
             slippage_cost=slippage*quantity
             brokerage_cost=brokerage
 
-            # print(slippage_cost,brokerage_cost)
 
             # Calculate PNL considering slippage and brokerages
             pnl=(current_price - price) * quantity - (slippage_cost+ brokerage_cost)
