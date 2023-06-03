@@ -93,9 +93,8 @@ class FNODownloader:
             if pd.to_datetime(date.today()).date() == pd.to_datetime(last_accessed_date_fut).date():
                 print('Data is already updated')
                 return
-            else:
-                start = pd.to_datetime(last_accessed_date_fut).date()
-                to_today = date.today()
+            start = pd.to_datetime(last_accessed_date_fut).date()
+            to_today = date.today()
   
         expiry_date = self.nse_downloader.get_expiry(
             start.year, start.month, start.day)

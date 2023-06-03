@@ -237,9 +237,9 @@ class ProcessData:
 
         if start_date and end_date:
             next_expiry = self.get_month_expiry(end_date)
-            prev_expiry = self.nse_downloader.get_expiry(
-                start_date.year if start_date.month != 1 else start_date.year - 1,
-                start_date.month-1 if start_date.month != 1 else 12, 1) + timedelta(days=1)
+            start_date=start_date-relativedelta(months=1)
+            #previous months first day to get that months expiry date for script
+            prev_expiry=self.get_month_expiry(start_date.replace(day=1)) + timedelta(days=1) 
 
             match_query = {
                 "$match": {
@@ -360,13 +360,7 @@ class ProcessData:
             current_month[mask].to_csv('current.csv')
             return current_month
         if start_date and end_date:
-            expiry = self.nse_downloader.get_expiry(
-                start_date.year,
-                start_date.month)
-            df = self.get_last_two_months_data(expiry)
-            if df.empty or df['Expiry'].nunique() < 2:
-                print(f"No Data found for two months before {expiry}")
-                return
+            expiry = self.get_month_expiry(start_date)
             no_of_months = relativedelta(end_date, start_date).months+1
             while no_of_months > 0:
                 print(f"processing {expiry} expiry")
@@ -384,6 +378,5 @@ class ProcessData:
                 print(
                     f"Time Taken to process data for {expiry}:{time_taken} seconds")
                 expiry = expiry+relativedelta(months=1)
-                expiry = self.nse_downloader.get_expiry(
-                    expiry.year, expiry.month)
+                expiry =self.get_month_expiry(expiry.replace(day=1))
                 no_of_months -= 1
