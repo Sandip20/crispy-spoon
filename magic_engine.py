@@ -10,6 +10,7 @@ import time
 from typing import Optional, Union
 import pandas as pd
 from dotenv import load_dotenv
+from dateutil.relativedelta import relativedelta
 
 from data.constants import EXCLUSIONS, NO_OF_WORKING_DAYS_END_CALCULATION
 from data.fno_downloader import FNODownloader
@@ -264,10 +265,10 @@ class OptionWizard:
 
         try:
             start_time = time.time()
-            start_date = pd.to_datetime(date.today())
+         
             asyncio.run(
             self.fno_downloader
-            .download_historical_options(start_date, start_date,self.last_accessed_date_opt)
+            .download_historical_options(None, None,self.last_accessed_date_opt)
             )
             end_time = time.time()
             execution_time = end_time - start_time
@@ -291,3 +292,4 @@ class OptionWizard:
 
     def download_historical(self,start_date,end_date):
         self.fno_downloader.download_historical(start_date,end_date)
+        self.process_data.update_current_vs_prev_two_months(start_date,end_date)

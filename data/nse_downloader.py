@@ -180,7 +180,6 @@ class NSEDownloader:
             requests.exceptions.RequestException: If an error occurs while downloading the data.
         """
         try:
-            print(f'{symbol} is processing')
             loop = asyncio.get_event_loop()
             opt_data = await loop.run_in_executor(None, self.get_oneday_options_history, symbol,
                                                   option_type, s_date,
@@ -189,9 +188,6 @@ class NSEDownloader:
             opt_data['fut_close'] = fut_close
             return opt_data
 
-            # opt_data['weeks_to_expiry']=opt_data['days_to_expiry'].apply(self.get_week)
-            # record=
-            # self.stock_options.insert_many(self.data_frame_to_dict(opt_data))
         except requests.exceptions.RequestException as error:
             print(f"Error downloading Options data for {symbol} option Type:{type}: {error}")
     async def update_futures_data(self,ticker:str,start:datetime,end:datetime,expiry_date:datetime) ->pd.DataFrame :
@@ -211,7 +207,6 @@ class NSEDownloader:
             requests.exceptions.RequestException: If an error occurs while downloading the data.
         """
         try:
-            print(f'{ticker} is processing')
             ohlc_fut =await asyncio.get_event_loop().run_in_executor(None,
             self.nse_india.get_history,
             ticker,

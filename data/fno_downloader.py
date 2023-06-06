@@ -75,10 +75,9 @@ class FNODownloader:
             option_ohlc = await self.nse_downloader.download_historical_options(
                 symbol, s_date, end_date, expiry_date, strike_price, fut_close, option_type
             )
-            option_ohlc['weeks_to_expiry'] = option_ohlc['days_to_expiry'].apply(
-                get_week)
-            self.mongo.insert_many(data_frame_to_dict(
-                option_ohlc), 'atm_stock_options')
+            option_ohlc['weeks_to_expiry'] = option_ohlc['days_to_expiry'].apply(get_week)
+            records=data_frame_to_dict(option_ohlc)
+            self.mongo.insert_many(records, 'atm_stock_options')
         except Exception as _e:
             print(f"Error downloading Options data for {symbol}: {_e}")
 
@@ -303,10 +302,10 @@ class FNODownloader:
         
         print(f"Execution time to download futures: {execution_time} seconds")
         start_time = time.time()
-        asyncio.run(self.download_historical_options(start_date, start_date,None,False,True))
+        asyncio.run(self.download_historical_options(start_date, end_date,None,False,True))
         end_time = time.time()
         execution_time = end_time - start_time
         print(f"Execution time to downdload Options: {execution_time} seconds")
-        # self. update_security_names()
+        
 
 

@@ -5,6 +5,7 @@ import time
 from datetime import date, datetime, timedelta
 import requests
 import pandas as pd
+from ratelimit import limits, sleep_and_retry
 
 from data.constants import DATE_FORMAT, DATE_FORMAT_B, NSE_HOST
 
@@ -36,7 +37,9 @@ class NSE:
         self.session.mount('http://', adapter)
         self.session.mount('https://', adapter)
         self.request_count = 1
-
+        
+    @sleep_and_retry
+    @limits(calls=150,period=1) # 150 requests per 1 second
     def get_history(self, symbol: str, from_date: datetime, to_date: datetime, expiry_date: datetime, option_type='NA', strike_price="0.00"):
         """
         symbol: Nse Symbol
@@ -160,6 +163,7 @@ class NSE:
         # date.today().strftime(DATE_FORMAT)
         url = f'{NSE_HOST}/api/historical/fo/derivatives/meta?from={from_date}&to={from_date}&instrumentType=FUTSTK&symbol={symbol}'
         try:
+            print(url)
             response = self.session.get(url, headers=self.headers)
             response.raise_for_status()
             json_data = response.json()
