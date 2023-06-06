@@ -3,7 +3,7 @@ import os
 
 import pandas as pd
 from data.mongodb import Mongo
-from data.util import find_available_trade_exit, update_record
+from data.util import update_record
 
 class OrderManager:
     """Class to manage orders for a trading system."""
