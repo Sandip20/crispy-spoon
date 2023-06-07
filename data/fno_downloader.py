@@ -224,8 +224,7 @@ class FNODownloader:
             result = self.mongo.find_many(query, os.environ['OPTIONS_COLLECTION_NAME'],sort=[('Date', -1)])
 
             date_present = any( data_dict['Date'] == end for data_dict in result)
-
-            # if pd.Timestamp(end) in result
+            
             if date_present and len(result) > 0 and 'Lot_Size' in result[0]:
                 continue
             data = self.nse_downloader.get_oneday_options_history(

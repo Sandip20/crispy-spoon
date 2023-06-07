@@ -19,6 +19,6 @@ run this every quarter to keep updated files
 option_wizard.update_daily()
 record = option_wizard.find_cheapest_options(n=15)
 option_wizard.send_to_telegram(record['cheapest_options'], record['day'])
-start_month_date = date(2022, 9, 1)
-end_month_date = date(2023, 5, 12)
+start_month_date = date(2022,10, 1)
+end_month_date = date.today()
 backtest_me(option_wizard, start_month_date, end_month_date)
