@@ -208,6 +208,9 @@ class FNODownloader:
             one_day_before= pd.to_datetime(date.today())-timedelta(days=1)
             if end > one_day_before:
                 end =one_day_before
+                
+            if end >order['expiry']:
+                end = order['expiry']
             query = {
                 'Symbol': order['symbol'],
                 # "Date":end,
@@ -218,9 +221,12 @@ class FNODownloader:
                 'Strike Price': order['strike'],
                 'Expiry': order['expiry']
             }
-            result = self.mongo.find_many(query
-                , os.environ['OPTIONS_COLLECTION_NAME'])
-            if len(result) > 0 and 'Lot_Size' in result[0]:
+            result = self.mongo.find_many(query, os.environ['OPTIONS_COLLECTION_NAME'],sort=[('Date', -1)])
+
+            date_present = any( data_dict['Date'] == end for data_dict in result)
+
+            # if pd.Timestamp(end) in result
+            if date_present and len(result) > 0 and 'Lot_Size' in result[0]:
                 continue
             data = self.nse_downloader.get_oneday_options_history(
                 ticker=order['symbol'],
