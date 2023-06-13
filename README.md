@@ -39,6 +39,6 @@ todo:
 /api/v1/straddles?symbol=ABCAPITAL&from_date=2022-12-30&to_date=2023-02-23&weeks_to_expiry=week5
 /api/v1/straddles?symbol=JKCEMENT&from_date=2022-12-30&to_date=2023-02-23&weeks_to_expiry=week5
 /api/v1/futures?symbol=JKCEMENT&from_date=2022-12-30&to_date=2023-02-23&weeks_to_expiry=week5
+https://www.nseindia.com/products-services/equity-derivatives-list-underlyings-information
 
-
-
+https://www.nseindia.com/products-services/equity-derivatives-nifty50

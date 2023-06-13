@@ -2,7 +2,7 @@ from datetime import timedelta, date
 from matplotlib import pyplot as plt
 from data.constants import CLOSE_POSITION_AFTER, NO_OF_TRADES
 from magic_engine import OptionWizard
-initial_capital = 1000000
+initial_capital = 250000
 brokerage = 200
 slippage = 0.01
 
@@ -35,7 +35,6 @@ def backtest_strategy_mine(option_wizard: OptionWizard, start_month_date: date, 
             continue
 
         trade_date = option_wizard.get_trade_date(record['day'])
-        print(f"trade Date--------------{trade_date}------------")
         option_wizard.order_manager.place_orders(
             cheapest_records=record['cheapest_options'], trade_date=trade_date)
         option_wizard.fno_downloader.download_options_for_pnl()

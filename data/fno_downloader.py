@@ -71,6 +71,7 @@ class FNODownloader:
             fut_close, 
             option_type
         """
+        option_ohlc={}
         try:
             option_ohlc = await self.nse_downloader.download_historical_options(
                 symbol, s_date, end_date, expiry_date, strike_price, fut_close, option_type
@@ -79,7 +80,7 @@ class FNODownloader:
             records=data_frame_to_dict(option_ohlc)
             self.mongo.insert_many(records, 'atm_stock_options')
         except Exception as _e:
-            print(f"Error downloading Options data for {symbol}: {_e}")
+            print(f"Error downloading Options data for {symbol}: {option_ohlc}")
 
     async def update_futures_data(self, last_accessed_date_fut,start_date,end_date):
         """
@@ -194,63 +195,61 @@ class FNODownloader:
                 await asyncio.sleep(5)
             request_count += 2
         await asyncio.gather(*tasks)
-
+        
     def download_options_for_pnl(self):
         """
-        download options for P&L
+        Download options data for P&L calculation.
+
+        Fetches options data for each order from the database, filters based on criteria,
+        and inserts the relevant records into the options collection.
         """
 
         for order in self.mongo.find_many({}, os.environ['ORDERS_COLLECTION_NAME']):
-           
-            end = add_working_days(
-                order['created_at'], NO_OF_WORKING_DAYS_END_CALCULATION, self.holidays )
-          
-            one_day_before= pd.to_datetime(date.today())-timedelta(days=1)
-            if end > one_day_before:
-                end =one_day_before
-                
-            if end >order['expiry']:
-                end = order['expiry']
+            # Calculate the end date based on working days
+            end = add_working_days(order['created_at'], NO_OF_WORKING_DAYS_END_CALCULATION, self.holidays)
+
+            # Set the one day before the current date as the maximum end date
+            one_day_before = pd.to_datetime(date.today()) - timedelta(days=1)
+            end = min(end, one_day_before, order['expiry'])
+
+            start_date = order['created_at']
+
+            # Query to filter options records
             query = {
                 'Symbol': order['symbol'],
-                # "Date":end,
-                   "Date": {
+                "Date": {
                     "$gte": pd.to_datetime(order['created_at']),
                     "$lte": pd.to_datetime(end)
                 },
                 'Strike Price': order['strike'],
                 'Expiry': order['expiry']
             }
-            result = self.mongo.find_many(query, os.environ['OPTIONS_COLLECTION_NAME'],sort=[('Date', -1)])
 
-            date_present = any( data_dict['Date'] == end for data_dict in result)
-            
-            if date_present and len(result) > 0 and 'Lot_Size' in result[0]:
+            # Find relevant options records from the database
+            result = self.mongo.find_many(query, os.environ['OPTIONS_COLLECTION_NAME'], sort=[('Date', -1)])
+
+            # Check if the end date is already present in the result set
+            date_present = any(data_dict['Date'] == end for data_dict in result)
+            if date_present:
                 continue
-            data = self.nse_downloader.get_oneday_options_history(
-                ticker=order['symbol'],
-                opt_type='CE',
-                start_date=order['created_at'],
-                end_date=end,
-                expiry_date=order['expiry'],
-                strike=order['strike']
-            )
 
-            records = data_frame_to_dict(data)
-            self.mongo.insert_many(
-                records, os.environ['OPTIONS_COLLECTION_NAME'])
-            data = self.nse_downloader.get_oneday_options_history(
-                ticker=order['symbol'],
-                opt_type='PE',
-                start_date=order['created_at'],
-                end_date=end,
-                expiry_date=order['expiry'],
-                strike=order['strike']
-            )
-            records = data_frame_to_dict(data)
-            self.mongo.insert_many(
-                records, os.environ['OPTIONS_COLLECTION_NAME'])
-            
+            # If 'Lot_Size' is present in the first result, update the start date
+            if len(result) > 0 and 'Lot_Size' in result[0]:
+                start_date = end
+
+            # Fetch options data for both CE and PE types
+            opt_types = ['CE', 'PE']
+            for opt_type in opt_types:
+                data = self.nse_downloader.get_oneday_options_history(
+                    ticker=order['symbol'],
+                    opt_type=opt_type,
+                    start_date=start_date,
+                    end_date=end,
+                    expiry_date=order['expiry'],
+                    strike=order['strike']
+                )
+                records = data_frame_to_dict(data)
+                self.mongo.insert_many(records, os.environ['OPTIONS_COLLECTION_NAME'])
     
     async def _download_historical_futures(self,ticker,year,month):
         try:
