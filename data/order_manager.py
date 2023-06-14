@@ -66,12 +66,12 @@ class OrderManager:
 
         print(date_of_trade.strftime('%A'))
 
-    def clear_existing_trades(self):
+    def clear_existing_trades(self,trade_date):
         """
 
-        clears all the trades 
+        clears all the trades  with given trade_date
         """
-        self.mongo.delete_many({},os.environ['CLOSED_POSITIONS_COLLECTION_NAME'])
+        self.mongo.delete_many({"created_at":pd.to_datetime(trade_date) },os.environ['CLOSED_POSITIONS_COLLECTION_NAME'])
     def close_week_orders(self,orders_dict):
         """
         Closes all active orders for the current week. Retrieves the relevant option data from the database and calculates
