@@ -21,15 +21,15 @@ use('nse_historical');
 //deleteMany({'Date':{$gte:ISODate('2023-04-25T00:00:00.000+00:00')}})
 //  db.getCollection('stock_futures').deleteMany({'Date':{$gt:ISODate('2023-04-12T00:00:00.000+00:00')}})
 //  db.getCollection('activity').updateMany({   "instrument": "opt"},{
-//     $set:{"last_accessed_date": "2023-05-18T00:00:00.000Z"}
-//  }
-// )
+//     $set:{"last_accessed_date": "2023-06-08T00:00:00.000Z"}
+//  })
+db.getCollection('stocks_step').find({Symbol:'ONGC'})
 // db.getCollection('options_straddle').find({'Date':ISODate('2023-05-12T00:00:00.000+00:00')  })
 // db.getCollection('options_straddle').aggregate(
 // [
 //    {'$match': {'Date':ISODate('2023-05-12T00:00:00.000+00:00') , 'strike': {'$lt': 7000}, 'two_months_week_min_coverage': {'$ne':'nan'}, 'current_vs_prev_two_months': {'$gte': -5, '$lte': 0}}}, {'$group': {'_id': {'symbol': '$symbol', 'Date': '$Date', 'Expiry': '$Expiry', '%coverage': '$%coverage', 'two_months_week_min_coverage': '$two_months_week_min_coverage', 'current_vs_prev_two_months': '$current_vs_prev_two_months', 'strike': '$strike', 'straddle_premium': '$straddle_premium', 'week_min_coverage': '$week_min_coverage', 'weeks_to_expiry': '$weeks_to_expiry', 'days_to_expiry': '$days_to_expiry'}, 'distinct_val': {'$addToSet': '$Date'}}}, {'$unwind': {'path': '$distinct_val', 'preserveNullAndEmptyArrays': true}}, {'$project': {'symbol': '$_id.symbol', 'Date': '$_id.Date', '%coverage': '$_id.%coverage', 'two_months_week_min_coverage': '$_id.two_months_week_min_coverage', 'current_vs_prev_two_months': '$_id.current_vs_prev_two_months', 'strike': '$_id.strike', 'straddle_premium': '$_id.straddle_premium', 'week_min_coverage': '$_id.week_min_coverage', 'weeks_to_expiry': '$_id.weeks_to_expiry', 'days_to_expiry': '$_id.days_to_expiry', 'expiry': '$_id.Expiry', '_id': 0}}, {'$sort': {'current_vs_prev_two_months': 1}}, {'$limit': 15}])
 // db.getCollection('stocks_step').findOne({Symbol:"BEL"})
-// db.getCollection('closed_positions').find({ })
+db.getCollection('closed_positions').deleteMany({ })
 // db.getCollection('atm_stock_options').find(
 //     {
 //       Date: ISODate('2023-05-27T00:00:00.000+00:00')
@@ -183,44 +183,44 @@ db.getCollection('options_straddle').aggregate(find_cheapest_pipeline)
 // ]
 // )
 // db.getCollection('historical_options').find({'Symbol':'SBILIFE','Date':ISODate('2023-05-24T00:00:00.000+00:00')})
-const pipeline=[
-    {
-      $match: {
+// const pipeline=[
+//     {
+//       $match: {
 
-        Date: {
-          $gte: ISODate('2022-05-26T00:00:00.000+00:00'),
-          $lte: ISODate('2022-07-28T00:00:00.000+00:00')
-        }
-      }
-    },
-    {
-      $group: {
-        _id: {dayOfMonth:{ $dayOfMonth: "$Date"},  Expiry: "$Expiry",Date:"$Date"},
-        count: { $sum: 1 }
-      }
-    },
-    {
-      $project: {
-        _id: 0,
-        dayOfMonth: "$_id.dayOfMonth",
-        Expiry:"$_id.Expiry",
-        Date:"$_id.Date",
-        count: 1
-      }
-    },
-    {
-        $sort: {
-            Date: 1
-        }
-    }
-  ]
+//         Date: {
+//           $gte: ISODate('2022-05-26T00:00:00.000+00:00'),
+//           $lte: ISODate('2022-07-28T00:00:00.000+00:00')
+//         }
+//       }
+//     },
+//     {
+//       $group: {
+//         _id: {dayOfMonth:{ $dayOfMonth: "$Date"},  Expiry: "$Expiry",Date:"$Date"},
+//         count: { $sum: 1 }
+//       }
+//     },
+//     {
+//       $project: {
+//         _id: 0,
+//         dayOfMonth: "$_id.dayOfMonth",
+//         Expiry:"$_id.Expiry",
+//         Date:"$_id.Date",
+//         count: 1
+//       }
+//     },
+//     {
+//         $sort: {
+//             Date: 1
+//         }
+//     }
+//   ]
   // db.getCollection('atm_stock_options').deleteMany({
   //   Date: {
-  //     $gte: ISODate('2022-05-26T00:00:00.000+00:00'),
-  //     $lte: ISODate('2022-07-28T00:00:00.000+00:00')
+  //     $gte: ISODate('2023-06-08T00:00:00.000+00:00'),
+  //     $lte: ISODate('2023-07-28T00:00:00.000+00:00')
   //   }
   // })
-  db.getCollection('atm_stock_options').aggregate(pipeline)
+  // db.getCollection('atm_stock_options').aggregate(pipeline)
 //  db.getCollection('atm_stock_options').aggregate([
 //         {
 //               $match: {

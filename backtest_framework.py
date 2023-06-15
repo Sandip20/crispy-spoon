@@ -1,7 +1,7 @@
 from datetime import timedelta, date
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 from data.constants import CLOSE_POSITION_AFTER, NO_OF_TRADES
 from magic_engine import OptionWizard
 
@@ -94,13 +94,14 @@ def backtest_strategy_mine(option_wizard: OptionWizard, start_month_date: date, 
     print("Win Rate:", win_rate)
     print("Sharpe Ratio:", sharpe_ratio)
     option_wizard.telegram.telegram_bot(
-        f""" Total Trades: {total_trades}\n Total Wins:{total_wins}\n Total Losses:{total_losses}\n Total Returns:{total_returns}\n Win Rate:{win_rate}\n Sharpe Ratio:{sharpe_ratio}\n """)
+        f""" Open Positions:{portfolio['symbols']}
+        Total Trades: {total_trades}\n Total Wins:{total_wins}\n Total Losses:{total_losses}\n Total Returns:{total_returns}\n Win Rate:{win_rate}\n Sharpe Ratio:{sharpe_ratio}\n """)
     # Plotting the backtest results
-    plt.plot(trade_dates, pnl_history)
-    plt.xlabel('Trade Date')
-    plt.ylabel('Profit/Loss')
-    plt.title('Backtest Results')
-    plt.show()
+    # plt.plot(trade_dates, pnl_history)
+    # plt.xlabel('Trade Date')
+    # plt.ylabel('Profit/Loss')
+    # plt.title('Backtest Results')
+    # plt.show()
 
 
 def backtest_me(option_wizard: OptionWizard, start_month_date, end_month_date):

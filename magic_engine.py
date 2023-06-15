@@ -293,3 +293,38 @@ class OptionWizard:
     def download_historical(self,start_date,end_date):
         self.fno_downloader.download_historical(start_date,end_date)
         self.process_data.update_current_vs_prev_two_months(start_date,end_date)
+
+    def update_stocks_info(self):
+        """
+            Updates the stocks information by downloading and processing strike info and lot info data.
+
+            This function downloads the strike info and lot info files, cleans the data, merges the datasets,
+            and updates the stocks_step collection in the database with the updated information.
+
+            Returns:
+            None
+        """
+        # Define the file names and paths
+        strike_info_path = os.path.join('files', os.environ['STRIKE_INFO_NAME'])
+        lot_info_path = os.path.join('files', os.environ['LOT_INFO_NAME'])
+
+        # Download the files
+        self.nse_downloader.download_file(strike_info_path)
+        self.nse_downloader.download_file(lot_info_path)
+
+        # Load and clean the strike info data
+        strike_info_df = pd.read_excel(strike_info_path, header=2, usecols=range(4))
+        strike_info_df.columns = ['Symbol', 'step', 'no_of_strikes', 'additional_strikes_enabled_intraday']
+
+        # Load and clean the lot info data
+        lot_info_df = pd.read_csv(lot_info_path, skiprows=[0, 1, 2, 3, 4], usecols=[1, 2], names=['Symbol', 'lot_size'])
+        lot_info_df = lot_info_df.apply(lambda x: x.str.strip()).dropna()
+        lot_info_df['lot_size'] = lot_info_df['lot_size'].astype(int)
+
+        # Merge the data frames
+        merged_df = strike_info_df.merge(lot_info_df, on="Symbol", how="left")
+
+        # Update the database
+        self.mongo.delete_many({},os.environ['STOCK_STEP_COLLECTON_NAME'])
+        # self.stocks_step.delete_many({})
+        self.mongo.insert_many(merged_df.to_dict('records'),os.environ['STOCK_STEP_COLLECTON_NAME'])

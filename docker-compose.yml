@@ -13,11 +13,21 @@
 version: "3"
 
 services:
-  jupyter:
-    image: continuumio/miniconda3
-    ports:
-      - "8888:8888"
-    command: >
-      /bin/bash -c "conda install jupyter -y --quiet &&
-      mkdir -p /opt/notebooks &&
-      jupyter notebook --notebook-dir=/opt/notebooks --ip='*' --port=8888 --no-browser --allow-root"
+  crispy-spoon:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    volumes:
+      - /Users/sandip.pawar/Documents/data:/app/data
+    # command: python start_egine.py
+
+  # jupyter:
+  #   image: continuumio/miniconda3
+  #   ports:
+  #     - "8888:8888"
+  #   command: >
+  #     /bin/bash -c "conda install jupyter -y --quiet &&
+  #     mkdir -p /opt/notebooks &&
+  #     jupyter notebook --notebook-dir=/opt/notebooks --ip='*' --port=8888 --no-browser --allow-root"
