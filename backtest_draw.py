@@ -16,7 +16,7 @@ closed_order=db[os.environ['CLOSED_POSITIONS_COLLECTION_NAME']]
 
 
 start_date=date(2022,10,1)
-end_date=date(2023,5,25)
+end_date=date.today()
 pipeline = [
     {
         "$match": {
