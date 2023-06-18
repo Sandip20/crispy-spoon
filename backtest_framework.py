@@ -93,8 +93,23 @@ def backtest_strategy_mine(option_wizard: OptionWizard, start_month_date: date, 
     print("Total Returns:", total_returns)
     print("Win Rate:", win_rate)
     print("Sharpe Ratio:", sharpe_ratio)
+    open_positions=""
+
+    pnl=0
+    for symbol,position in portfolio['symbols'].items():
+
+        open_positions+=f""" 
+        {position['symbol']} | {position['strike']} | {position['pnl']} \n
+        """  
+        pnl+=position['pnl']
+    
+    open_positions+=f""" 
+    Trade Profit_Loss:{pnl} \n
+    """
     option_wizard.telegram.telegram_bot(
-        f""" Open Positions:{portfolio['symbols']}
+        f""" ------------Open Positions------------------ \n
+        {open_positions}
+        ------------------------------------------------- \n
         Total Trades: {total_trades}\n Total Wins:{total_wins}\n Total Losses:{total_losses}\n Total Returns:{total_returns}\n Win Rate:{win_rate}\n Sharpe Ratio:{sharpe_ratio}\n """)
     # Plotting the backtest results
     # plt.plot(trade_dates, pnl_history)
