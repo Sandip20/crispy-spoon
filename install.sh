@@ -5,3 +5,4 @@
 conda install -y pandas  # installs pandas
 conda install -y ipython  # installs IPython shell
 conda install -y  pymongo # installs pymongo dependencies
+conda  install -y numpy
