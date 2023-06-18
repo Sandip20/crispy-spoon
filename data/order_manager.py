@@ -72,7 +72,7 @@ class OrderManager:
         clears all the trades  with given trade_date
         """
         self.mongo.delete_many({"created_at":pd.to_datetime(trade_date) },os.environ['CLOSED_POSITIONS_COLLECTION_NAME'])
-    def close_week_orders(self,orders_dict):
+    def close_week_orders(self,orders_dict,position_status):
         """
         Closes all active orders for the current week. Retrieves the relevant option data from the database and calculates
         the profit or loss made on the trades. Finally, inserts the details of the closed positions into a separate
@@ -87,7 +87,8 @@ class OrderManager:
                 **order,
                 'profit_loss':order['pnl'],
                 'margin':order['capital'],
-                'exit_price':order['current_price']
+                'exit_price':order['current_price'],
+                'status':position_status
                 }
             positions.append(position)
         self.mongo.insert_many(positions, os.environ['CLOSED_POSITIONS_COLLECTION_NAME'])

@@ -56,7 +56,15 @@ def backtest_strategy_mine(option_wizard: OptionWizard, start_month_date: date, 
 
         # Get portfolio P&L and calculate returns
         portfolio = option_wizard.get_portfolio_pnl(total_capital, slippage=slippage, brokerage=brokerage)
-        if portfolio['total_capital'] > 0:
+
+        current_date += timedelta(days=CLOSE_POSITION_AFTER)
+        position_status= 'CLOSED' if (end_month_date - current_date).days > 0 else 'OPEN'
+        portfolio['status']=position_status
+        
+        # Close week orders
+        option_wizard.order_manager.close_week_orders(portfolio['symbols'],position_status)
+        
+        if portfolio['total_capital'] > 0 and portfolio['status']=='CLOSED':
             pnl = round(portfolio['pnl'], 2)
             returns = round((portfolio['pnl'] / total_capital) * 100, 2)
             pnl_history.append(pnl)
@@ -72,9 +80,8 @@ def backtest_strategy_mine(option_wizard: OptionWizard, start_month_date: date, 
         else:
             pnl_history.append(0)
 
-        # Close week orders
-        option_wizard.order_manager.close_week_orders(portfolio['symbols'])
-        current_date += timedelta(days=CLOSE_POSITION_AFTER)
+    
+     
 
     total_losses = total_trades - total_wins
     total_profit = round(total_capital - initial_capital, 2)
