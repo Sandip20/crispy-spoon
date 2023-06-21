@@ -211,6 +211,7 @@ class OptionWizard:
             )
             current_price = float(data[0]['Close']) + float(data[1]['Close'])
             quantity = data[0]['Lot_Size']
+            dte=(data[0]['Expiry']-data[0]['Date']).days
 
             # Calculate slippage and brokerages
             slippage_cost=slippage*quantity
@@ -229,10 +230,12 @@ class OptionWizard:
                 'capital': round(price * quantity, 2),
                 'pnl': round(pnl, 2),
                 'expiry':data[0]['Expiry'],
-                'exit_date':data[0]['Date']
+                'exit_date':data[0]['Date'],
+                'dte':dte
             }
 
             portfolio_pnl['symbols'][symbol] = symbol_data
+            portfolio_pnl['dte']= dte
             portfolio_pnl['pnl'] += symbol_data['pnl']
             portfolio_pnl['used_capital'] += symbol_data['capital']
             portfolio_pnl['total_capital'] -= portfolio_pnl['used_capital']

@@ -56,7 +56,14 @@ def backtest_strategy_mine(option_wizard: OptionWizard, start_month_date: date, 
 
         # Get portfolio P&L and calculate returns
         portfolio = option_wizard.get_portfolio_pnl(total_capital, slippage=slippage, brokerage=brokerage)
-
+        
+        """
+        add logic based on days_to_expiry  to close the position
+        also check if premium of the current position is increased and its not cheap anymore then also we can close the position
+        also check if premium melted 12% of the total premium  buy if its so we need close the position in order to avoid more loss on it
+         portfolio['dte']
+         """
+        
         current_date += timedelta(days=CLOSE_POSITION_AFTER)
         position_status= 'CLOSED' if (end_month_date - current_date).days > 0 else 'OPEN'
         portfolio['status']=position_status
