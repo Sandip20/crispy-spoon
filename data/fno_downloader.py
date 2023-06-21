@@ -209,7 +209,7 @@ class FNODownloader:
             end = add_working_days(order['created_at'], NO_OF_WORKING_DAYS_END_CALCULATION, self.holidays)
 
             # Set the one day before the current date as the maximum end date
-            one_day_before = get_last_business_day(pd.to_datetime(date.today()) - timedelta(days=1),self.holidays)
+            one_day_before = get_last_business_day(pd.to_datetime(date.today()),self.holidays)
             end = min(end, one_day_before, order['expiry'])
 
             start_date = order['created_at']
