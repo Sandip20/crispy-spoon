@@ -12,7 +12,7 @@ import pandas as pd
 from dotenv import load_dotenv
 from dateutil.relativedelta import relativedelta
 
-from data.constants import EXCLUSIONS, NO_OF_WORKING_DAYS_END_CALCULATION
+from data.constants import EXCLUSIONS, MAX_LOSS_PER_POSITION, NO_OF_WORKING_DAYS_END_CALCULATION
 from data.fno_downloader import FNODownloader
 from data.mongodb import Mongo
 from data.nse_downloader import NSEDownloader
@@ -168,7 +168,113 @@ class OptionWizard:
         
         trade_date = self.get_trade_date(today)
         self.telegram.send_to_telegram(cheapest_records, trade_date)
-   
+    def get_portfolio_pnl_v2(self, initial_capital:float,slippage:float,brokerage:float) -> dict:
+        """
+        Returns the profit and loss (PNL) of the portfolio and the total capital used in the portfolio.
+        
+        Parameters:
+            initial_capital (float): The initial capital used to trade the portfolio.
+        
+        Returns:
+            portfolio_pnl (dict): A dictionary containing the portfolio's PNL, total capital, and symbol-wise PNL data.
+        """
+
+        portfolio_pnl = {
+            'pnl': 0,
+            'total_capital': initial_capital,
+            'used_capital': 0,
+            'symbols': {}
+        }
+
+        orders = self.mongo.find_many({}, os.environ['ORDERS_COLLECTION_NAME'])
+
+        for order in orders:
+            symbol = order['symbol']
+            strike = order['strike']
+            created_at = order['created_at']
+            price = order['price']
+
+            end = add_working_days(
+                created_at, NO_OF_WORKING_DAYS_END_CALCULATION, self.holidays)
+            
+            one_day_before = pd.to_datetime(date.today())-timedelta(days=1)
+            if end > one_day_before:
+                end = one_day_before
+            """
+            Get all the records between create_date and max_close_date  records sorted in ascending order of the date
+            look for  the date on which Pnl <= -80000 that position status will be closed  that day will be the closing_date of the position
+            """
+            # Find data matching specified criteria
+            data = self.mongo.find_many(
+                {'Symbol': symbol, 'Strike Price': strike, 'Date': {'$gte': created_at, '$lte': end}},
+                os.environ['OPTIONS_COLLECTION_NAME'],
+                sort=[('Date', 1)]
+                # ,
+                # limit=2
+            )
+
+            # Get unique dates in ascending order
+            unique_dates = sorted(set(item['Date'] for item in data))
+
+            position_status='OPEN'
+            # Iterate over unique dates
+            for t_date in unique_dates:
+                # Filter data for the current date
+                filtered_data = [item for item in data if item['Date'] == t_date]
+                
+                # Calculate current price
+                current_price = float(filtered_data[0]['Close']) + float(filtered_data[1]['Close'])
+                
+                # Get quantity
+                quantity = filtered_data[0]['Lot_Size']
+                pnl=(current_price - price) * quantity
+                # Get expiry date
+                expiry = filtered_data[0]['Expiry']
+
+                if pnl <= MAX_LOSS_PER_POSITION:
+                    # Calculate days to expiry (dte)
+                    dte = (filtered_data[0]['Expiry'] - filtered_data[0]['Date']).days
+                    # Set exit date
+                    exit_date = t_date
+                    position_status= 'CLOSED'
+                    break
+
+                if (end-t_date).days == 0:
+                    exit_date = t_date
+                    position_status= 'CLOSED'
+                else
+                  
+            # Calculate slippage and brokerages
+            slippage_cost=slippage*quantity
+            brokerage_cost=brokerage
+
+
+            # Calculate PNL considering slippage and brokerages
+            pnl -= (slippage_cost+ brokerage_cost)
+            symbol_data = {
+                'symbol':symbol,
+                'quantity': quantity,
+                'strike': strike,
+                'created_at': created_at,
+                'buy_price': price,
+                'current_price': current_price,
+                'capital': round(price * quantity, 2),
+                'pnl': round(pnl, 2),
+                'expiry':expiry,
+                'exit_date':exit_date,
+                'dte':dte,
+                'status':position_status
+            }
+
+            portfolio_pnl['symbols'][symbol] = symbol_data
+            portfolio_pnl['dte']= dte
+            portfolio_pnl['pnl'] += symbol_data['pnl']
+            portfolio_pnl['used_capital'] += symbol_data['capital']
+            portfolio_pnl['total_capital'] -= portfolio_pnl['used_capital']
+
+        return portfolio_pnl
+    
+    
     def get_portfolio_pnl(self, initial_capital:float,slippage:float,brokerage:float) -> dict:
         """
         Returns the profit and loss (PNL) of the portfolio and the total capital used in the portfolio.

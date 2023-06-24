@@ -2,7 +2,7 @@ from datetime import timedelta, date
 import numpy as np
 import pandas as pd
 # import matplotlib.pyplot as plt
-from data.constants import CLOSE_POSITION_AFTER, NO_OF_TRADES
+from data.constants import CLOSE_POSITION_AFTER, MAX_LOSS_PER_POSITION, NO_OF_TRADES
 from magic_engine import OptionWizard
 
 brokerage = 200
@@ -55,17 +55,24 @@ def backtest_strategy_mine(option_wizard: OptionWizard, start_month_date: date, 
         option_wizard.fno_downloader.download_options_for_pnl()
 
         # Get portfolio P&L and calculate returns
-        portfolio = option_wizard.get_portfolio_pnl(total_capital, slippage=slippage, brokerage=brokerage)
-        
+        portfolio = option_wizard.get_portfolio_pnl_v2(total_capital, slippage=slippage, brokerage=brokerage)
+        current_date += timedelta(days=CLOSE_POSITION_AFTER)
+
+        position_status= 'CLOSED' if (end_month_date - current_date).days > 0 else 'OPEN'
         """
         add logic based on days_to_expiry  to close the position
         also check if premium of the current position is increased and its not cheap anymore then also we can close the position
         also check if premium melted 12% of the total premium  buy if its so we need close the position in order to avoid more loss on it
          portfolio['dte']
          """
-        
-        current_date += timedelta(days=CLOSE_POSITION_AFTER)
-        position_status= 'CLOSED' if (end_month_date - current_date).days > 0 else 'OPEN'
+        for symbol,position in portfolio['symbols'].items():
+            position_pnl=position['pnl']
+            capital=position['capital']
+            if position_pnl <= MAX_LOSS_PER_POSITION:
+                portfolio['total_capital']+=(capital-position_pnl)
+                portfolio['used_capital']-=capital
+                portfolio['status']='CLOSED'
+
         portfolio['status']=position_status
         
         # Close week orders
