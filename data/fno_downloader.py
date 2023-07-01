@@ -104,7 +104,9 @@ class FNODownloader:
             new_date = expiry_date + timedelta(1)
             expiry_date = self.nse_downloader.get_expiry(
                 new_date.year, new_date.month, new_date.day)
-            expiry_dates.append(expiry_date)
+            if expiry_date is not str:
+                 expiry_dates.append(expiry_date)
+            
         for idx, expiry_date in enumerate(expiry_dates):
             if idx != 0:
                 start = expiry_dates[idx-1]

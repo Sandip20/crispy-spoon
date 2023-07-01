@@ -273,14 +273,14 @@ class ProcessData:
     def get_last_two_months_data(self, today: date) -> pd.DataFrame:
         """
         Args:
-        today:date
+            today:date
         Returns:
-        pd.Dataframe
+            pd.DataFrame
 
         """
-        new_date = today-relativedelta(months=1)
+        new_date = (today-relativedelta(months=1)).replace(day=2)
         prev_one_month_expiry = self.get_month_expiry(new_date)
-        new_date = today-relativedelta(months=3)
+        new_date = (today-relativedelta(months=2)).replace(day=2)
         prev_second_month_expiry = self.get_month_expiry(new_date)
         return pd.DataFrame(self.mongo.find_many({
             "Expiry":{
