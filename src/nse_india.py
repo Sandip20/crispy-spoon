@@ -176,4 +176,6 @@ class NSE:
             # return datetime.strptime(date_string, DATE_FORMAT_B).date()
 
         except (requests.exceptions.HTTPError, KeyError, IndexError, ValueError) as error:
-            raise Exception('Could not get expiry date from NSE website.') from error
+            print('Could not get expiry date from NSE website.')
+            return ''
+            # raise Exception('Could not get expiry date from NSE website.') from error

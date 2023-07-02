@@ -57,28 +57,11 @@ def backtest_strategy_mine(option_wizard: OptionWizard, start_month_date: date, 
         # Get portfolio P&L and calculate returns
         portfolio = option_wizard.get_portfolio_pnl_v2(total_capital, slippage=slippage, brokerage=brokerage)
         current_date += timedelta(days=CLOSE_POSITION_AFTER)
-
-        position_status= 'CLOSED' if (end_month_date - current_date).days > 0 else 'OPEN'
-        """
-        add logic based on days_to_expiry  to close the position
-        also check if premium of the current position is increased and its not cheap anymore then also we can close the position
-        also check if premium melted 12% of the total premium  buy if its so we need close the position in order to avoid more loss on it
-         portfolio['dte']
-         """
-        for symbol,position in portfolio['symbols'].items():
-            position_pnl=position['pnl']
-            capital=position['capital']
-            if position_pnl <= MAX_LOSS_PER_POSITION:
-                portfolio['total_capital']+=(capital-position_pnl)
-                portfolio['used_capital']-=capital
-                portfolio['status']='CLOSED'
-
-        portfolio['status']=position_status
         
         # Close week orders
-        option_wizard.order_manager.close_week_orders(portfolio['symbols'],position_status)
+        option_wizard.order_manager.close_week_orders(portfolio['symbols'])
         
-        if portfolio['total_capital'] > 0 and portfolio['status']=='CLOSED':
+        if portfolio['total_capital'] > 0:
             pnl = round(portfolio['pnl'], 2)
             returns = round((portfolio['pnl'] / total_capital) * 100, 2)
             pnl_history.append(pnl)

@@ -10,7 +10,7 @@ import time
 from typing import List
 import pandas as pd
 from dateutil.relativedelta import relativedelta
-from data.constants import MONTHS_IN_YEAR, NO_OF_WORKING_DAYS_END_CALCULATION
+from data.constants import EXCEPTION_DATE, MONTHS_IN_YEAR, NO_OF_WORKING_DAYS_END_CALCULATION
 from data.util import add_working_days, data_frame_to_dict, get_last_business_day, get_strike, get_week
 from data.mongodb import Mongo
 from data.nse_downloader import NSEDownloader
@@ -231,7 +231,7 @@ class FNODownloader:
             result = self.mongo.find_many(query, os.environ['OPTIONS_COLLECTION_NAME'], sort=[('Date', -1)])
 
             # Check if the end date is already present in the result set
-            date_present = any(data_dict['Date'] == end for data_dict in result)
+            date_present = any(data_dict['Date'] == end for data_dict in result) or end== pd.to_datetime(EXCEPTION_DATE)
             if date_present:
                 continue
 

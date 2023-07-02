@@ -1,6 +1,6 @@
 # pylint: disable=broad-exception-caughtNSEDownloader
 """ 
-OptionWizard class  is main class which will  import neccessary modules and 
+OptionWizard class  is main class which will  import necessary modules and 
 calls respective methods
 """
 import asyncio
@@ -221,13 +221,15 @@ class OptionWizard:
             for t_date in unique_dates:
                 # Filter data for the current date
                 filtered_data = [item for item in data if item['Date'] == t_date]
+                if(len(filtered_data)<2):
+                    continue
                 
                 # Calculate current price
                 current_price = float(filtered_data[0]['Close']) + float(filtered_data[1]['Close'])
                 
                 # Get quantity
                 quantity = filtered_data[0]['Lot_Size']
-                pnl=(current_price - price) * quantity
+                pnl=round((current_price - price) * quantity,2)
                 # Get expiry date
                 expiry = filtered_data[0]['Expiry']
 
@@ -239,10 +241,11 @@ class OptionWizard:
                     position_status= 'CLOSED'
                     break
 
-                if (end-t_date).days == 0:
+                if (end-t_date).days >=0:
+                    dte = (filtered_data[0]['Expiry'] - filtered_data[0]['Date']).days
                     exit_date = t_date
                     position_status= 'CLOSED'
-                else
+   
                   
             # Calculate slippage and brokerages
             slippage_cost=slippage*quantity
