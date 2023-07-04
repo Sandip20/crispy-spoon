@@ -169,7 +169,7 @@ class ProcessData:
                         "week_min_coverage": rec['week_min_coverage']}}
                 ) for rec in aggregated]
 
-            result = self.mongo.bulk_write(bulk_operations)
+            result = self.mongo.bulk_write(bulk_operations, os.environ['STRADDLE_COLLECTION_NAME'])
             print(f"Modified {result.modified_count} documents")
 
         if update_last_two_months:
@@ -219,7 +219,7 @@ class ProcessData:
                     {"$set": {
                         "week_min_coverage": rec['week_min_coverage']}}
                 ) for rec in aggregated]
-            result = self.mongo.bulk_write(bulk_operations)
+            result = self.mongo.bulk_write(bulk_operations, os.environ['STRADDLE_COLLECTION_NAME'])
             print(f"Modified {result.modified_count} documents")
 
     def add_ce_pe_of_same_date(self, start_date, end_date):
@@ -236,28 +236,22 @@ class ProcessData:
         """
 
         if start_date and end_date:
-            next_expiry = self.get_month_expiry(end_date)
-            start_date=start_date-relativedelta(months=1)
-            #previous months first day to get that months expiry date for script
-            prev_expiry=self.get_month_expiry(start_date.replace(day=1)) + timedelta(days=1) 
+            current_expiry = self.get_month_expiry(end_date)
+            # start_date=start_date-relativedelta(months=1)
+            # #previous months first day to get that months expiry date for script
+            # prev_expiry=self.get_month_expiry(start_date.replace(day=1)) + timedelta(days=1) 
 
             match_query = {
                 "$match": {
-                    "Date": {
-                        "$gte": pd.to_datetime(prev_expiry),
-                        "$lte": pd.to_datetime(next_expiry)
-                    }
+                    "Expiry": pd.to_datetime(current_expiry)
+                
                 }
             }
             
             ADD_CE_PE_PIPELINE.insert(0, match_query)
             self.mongo.delete_many(
-                {
-                    "Date": {
-                        "$gte": pd.to_datetime(prev_expiry),
-                        "$lte": pd.to_datetime(next_expiry)
-                    }
-                },
+         {"Expiry": pd.to_datetime(current_expiry)}
+             ,
                 os.environ['STRADDLE_COLLECTION_NAME']
             )
         aggregated = self.mongo.aggregate(
@@ -273,14 +267,15 @@ class ProcessData:
     def get_last_two_months_data(self, today: date) -> pd.DataFrame:
         """
         Args:
-            today:date
+        today:date
         Returns:
-            pd.DataFrame
+        pd.DataFrame
 
         """
         new_date = (today-relativedelta(months=1)).replace(day=2)
         prev_one_month_expiry = self.get_month_expiry(new_date)
         new_date = (today-relativedelta(months=2)).replace(day=2)
+     
         prev_second_month_expiry = self.get_month_expiry(new_date)
         return pd.DataFrame(self.mongo.find_many({
             "Expiry":{
@@ -355,10 +350,11 @@ class ProcessData:
             last_two_months = last_two_months[expiry_mask]
 
             current_month = process_monthly_data(
-                current_month=current_month, last_two_months=last_two_months)
+                current_month=current_month, last_two_months=last_two_months).drop(columns=['_id'])
             mask = current_month["current_vs_prev_two_months"] > -5
-            current_month[mask].to_csv('current.csv')
+            current_month[mask].to_csv('current.csv',index=False)
             return current_month
+        
         if start_date and end_date:
             expiry = self.get_month_expiry(start_date)
             no_of_months = relativedelta(end_date, start_date).months+1

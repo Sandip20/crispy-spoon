@@ -398,12 +398,14 @@ class OptionWizard:
         self.process_data.add_ce_pe_of_same_date(
             start_date=start_date, end_date=start_date)
         print('data processing')
+        self.process_data.update_week_min_coverage()
         self.process_data.update_current_vs_prev_two_months(
             today=True).to_csv('current.csv')
         print('CSV generated')
 
     def download_historical(self,start_date,end_date):
         self.fno_downloader.download_historical(start_date,end_date)
+        self.process_data.update_week_min_coverage(start_date,end_date)
         self.process_data.update_current_vs_prev_two_months(start_date,end_date)
 
     def update_stocks_info(self):
