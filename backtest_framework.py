@@ -37,7 +37,10 @@ def backtest_strategy_mine(option_wizard: OptionWizard, start_month_date: date, 
         record = option_wizard.find_cheapest_options(n=NO_OF_TRADES, input_date=current_date, back_test=True)
 
         # Filter out options that have already expired
-        record['cheapest_options'] = [d for d in record['cheapest_options'] if d['expiry'] > d['Date']]
+        record['cheapest_options'] = [
+            d for d in record['cheapest_options'] 
+            if d['expiry'] > d['Date'] and d['days_to_expiry']>2
+            ]
 
         if len(record['cheapest_options']) == 0:
             current_date += timedelta(days=1)
@@ -79,7 +82,8 @@ def backtest_strategy_mine(option_wizard: OptionWizard, start_month_date: date, 
 
     
      
-
+    if total_trades==0:
+        return
     total_losses = total_trades - total_wins
     total_profit = round(total_capital - initial_capital, 2)
     total_returns = round((total_profit / initial_capital) * 100, 2)
@@ -100,16 +104,15 @@ def backtest_strategy_mine(option_wizard: OptionWizard, start_month_date: date, 
     open_positions=""
 
     pnl=0
-    for symbol,position in portfolio['symbols'].items():
-
-        open_positions+=f""" 
-        {position['symbol']} | {position['strike']} | {position['pnl']} \n
-        """  
-        pnl+=position['pnl']
-    
-    open_positions+=f""" 
-    Trade Profit_Loss:{pnl} \n
-    """
+    for _,position in portfolio['symbols'].items():
+        if position['status']=='CLOSED':
+            open_positions+=f""" 
+            {position['symbol']} | {position['strike']} | {position['pnl']} \n
+            """  
+            pnl+=position['pnl']
+            open_positions+=f""" 
+            Trade Profit_Loss:{pnl} \n
+            """
     option_wizard.telegram.telegram_bot(
         f""" ------------Open Positions------------------ \n
         {open_positions}

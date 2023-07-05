@@ -362,6 +362,9 @@ class ProcessData:
                 print(f"processing {expiry} expiry")
                 current_month = self.get_current_month_data(expiry)
                 df_two_months_data = self.get_last_two_months_data(expiry)
+                df_two_months_data['weeks_to_expiry'] = df_two_months_data ['days_to_expiry'].apply(
+                get_week)
+               
 
                 start_time = time.time()
 

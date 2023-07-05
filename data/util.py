@@ -93,6 +93,7 @@ def get_strike(price,step):
     else:
         price=float(price+(step-reminder)) if isinstance(step,float) else   int(price+(step-reminder))
     return f'{price:.2f}'
+
 def get_week(days_to_expiry:int)->str:
     """
     It accepts  number of days to expiry and return  the  week to expiry
