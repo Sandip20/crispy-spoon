@@ -82,7 +82,7 @@ class OptionWizard:
         symbol_lot_details = {}
         tickers = []
 
-        for item in self.mongo.find_many({}, 'stocks_step'):
+        for item in self.mongo.find_many({}, os.environ['STOCK_STEP_COLLECTON_NAME']):
             df_dict[item['Symbol']] = float(item['step'])
             symbol_lot_details[item['Symbol']
                                ] = item['lot_size'] if 'lot_size' in item.keys() else 0
@@ -424,14 +424,16 @@ class OptionWizard:
 
         # Download the files
         self.nse_downloader.download_file(strike_info_path)
+    
         self.nse_downloader.download_file(lot_info_path)
 
         # Load and clean the strike info data
         strike_info_df = pd.read_excel(strike_info_path, header=2, usecols=range(4))
         strike_info_df.columns = ['Symbol', 'step', 'no_of_strikes', 'additional_strikes_enabled_intraday']
 
-        # Load and clean the lot info data
+        # Load and clean the lot i5nfo data
         lot_info_df = pd.read_csv(lot_info_path, skiprows=[0, 1, 2, 3, 4], usecols=[1, 2], names=['Symbol', 'lot_size'])
+        lot_info_df =lot_info_df.iloc[1:]
         lot_info_df = lot_info_df.apply(lambda x: x.str.strip()).dropna()
         lot_info_df['lot_size'] = lot_info_df['lot_size'].astype(int)
 
