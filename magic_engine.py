@@ -241,12 +241,11 @@ class OptionWizard:
                     position_status= 'CLOSED'
                     break
 
-                if (end-t_date).days >=0:
+                if (expiry-t_date).days <=1 or (end-t_date).days == 0:
                     dte = (filtered_data[0]['Expiry'] - filtered_data[0]['Date']).days
                     exit_date = t_date
                     position_status= 'CLOSED'
-   
-                  
+                    break
             # Calculate slippage and brokerages
             slippage_cost=slippage*quantity
             brokerage_cost=brokerage
@@ -310,8 +309,7 @@ class OptionWizard:
             one_day_before = pd.to_datetime(date.today())-timedelta(days=1)
             if end > one_day_before:
                 end = one_day_before
-        
-
+ 
             data = self.mongo.find_many(
                 {'Symbol': symbol, 'Strike Price': strike, 'Date': {'$lte': end}},
                 os.environ['OPTIONS_COLLECTION_NAME'],

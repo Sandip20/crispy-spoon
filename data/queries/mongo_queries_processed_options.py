@@ -4,6 +4,7 @@ Processed options queries
 from datetime import timezone,datetime
 from typing import Any, Dict, List
 
+from data.constants import EXCLUDE_SYMBOLS
 
 ADD_CE_PE_PIPELINE = [
             {
@@ -143,6 +144,7 @@ def create_find_cheapest_options_query(today:datetime,n:int)->List[Dict[str, Any
                 '$match': {
                     'Date': datetime(today.year, today.month, today.day, 0, 0, 0, tzinfo=timezone.utc),
                      "strike":{"$lt":7000},
+                     "symbol": {"$nin":EXCLUDE_SYMBOLS},
                     'two_months_week_min_coverage': {'$ne': float('nan')},
                     'current_vs_prev_two_months': {'$gte': -5, '$lte': 0},
                 }
