@@ -104,18 +104,21 @@ def backtest_strategy_mine(option_wizard: OptionWizard, start_month_date: date, 
     open_positions=""
 
     pnl=0
+    open_position_count=0
     for _,position in portfolio['symbols'].items():
-        if position['status']=='CLOSED':
+        if position['status']=='OPEN':
+            open_position_count+=1
             open_positions+=f""" 
-            {position['symbol']} | {position['strike']} | {position['pnl']} \n
+            {position['created_at'] | position['symbol']} | {position['strike']} | {position['pnl']} \n
             """  
             pnl+=position['pnl']
-            open_positions+=f""" 
-            Trade Profit_Loss:{pnl} \n
-            """
+
+    open_positions+=f""" 
+        Trade Profit_Loss:{pnl} \n
+        """
     option_wizard.telegram.telegram_bot(
-        f""" ------------Open Positions------------------ \n
-        {open_positions}
+        f""" ------------ Open Positions: {open_position_count}------------------ \n
+{open_positions if open_position_count > 0 else " "}
         ------------------------------------------------- \n
         Total Trades: {total_trades}\n Total Wins:{total_wins}\n Total Losses:{total_losses}\n Total Returns:{total_returns}\n Win Rate:{win_rate}\n Sharpe Ratio:{sharpe_ratio}\n """)
     # Plotting the backtest results

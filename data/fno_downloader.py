@@ -10,7 +10,7 @@ import time
 from typing import List
 import pandas as pd
 from dateutil.relativedelta import relativedelta
-from data.constants import EXCEPTION_DATE, MONTHS_IN_YEAR, NO_OF_WORKING_DAYS_END_CALCULATION
+from data.constants import EXCEPTION_DATE, MONTHS_IN_YEAR, NO_OF_WORKING_DAYS_END_CALCULATION, REQUESTS_PER_SEC
 from data.util import add_working_days, data_frame_to_dict, get_last_business_day, get_strike, get_week
 from data.mongodb import Mongo
 from data.nse_downloader import NSEDownloader
@@ -115,9 +115,13 @@ class FNODownloader:
                 end_date = expiry_date if to_today > expiry_date else to_today
 
             tasks = []
+            request_count=0
             for ticker in self.tickers:
+                request_count+=1
                 tasks.append(asyncio.ensure_future(
                     self._update_futures_data(ticker, start, end_date, expiry_date)))
+                if(request_count % REQUESTS_PER_SEC == 0):
+                    await asyncio.sleep(5)
         await asyncio.gather(*tasks)
 
     async def download_historical_options(self, start_date, end_date, last_accessed_date_opt, update_daily=True,update_date_wise=False):
@@ -193,7 +197,7 @@ class FNODownloader:
                         option_type
                     )))
             
-            if(request_count % 150 == 0):
+            if(request_count % REQUESTS_PER_SEC == 0):
                 await asyncio.sleep(5)
             request_count += 2
         await asyncio.gather(*tasks)
