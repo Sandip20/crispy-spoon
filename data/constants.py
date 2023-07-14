@@ -7,7 +7,7 @@ DATE_FORMAT = '%d-%m-%Y'  # it will give you date in the format 01-03-2023 DD-MM
 # it will give you date in the format 01-MAR-2023 DD-MMM-YYYY
 DATE_FORMAT_B = '%d-%b-%Y'
 NSE_HOST = 'https://www.nseindia.com'
-EXCLUDE_SYMBOLS=['']
+EXCLUDE_SYMBOLS=['HDFC'] #Excluding  due to merger of HDFC and HDFC bank happened so contracts got expired on 12th july
 #ADANIENT
 EXCLUSIONS = ["Saturday", "Sunday"]
 EXCEPTION_DATE='29-JUNE-2023'# The expiry date for NSE and BSE contracts was shifted from June 29th to June 28th. Only the day on which the expiry occurred was changed; the expiry date of contract remained the same.

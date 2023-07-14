@@ -2,7 +2,7 @@ from datetime import timedelta, date
 import numpy as np
 import pandas as pd
 # import matplotlib.pyplot as plt
-from data.constants import CLOSE_POSITION_AFTER, MAX_LOSS_PER_POSITION, NO_OF_TRADES
+from data.constants import CLOSE_POSITION_AFTER, NO_OF_TRADES
 from magic_engine import OptionWizard
 
 brokerage = 200
@@ -60,6 +60,8 @@ def backtest_strategy_mine(option_wizard: OptionWizard, start_month_date: date, 
         # Get portfolio P&L and calculate returns
         portfolio = option_wizard.get_portfolio_pnl_v2(total_capital, slippage=slippage, brokerage=brokerage)
         current_date += timedelta(days=CLOSE_POSITION_AFTER)
+        # current_date=add_working_days(pd.to_datetime(trade_date), NO_OF_WORKING_DAYS_END_CALCULATION, option_wizard.holidays).date()
+     
         
         # Close week orders
         option_wizard.order_manager.close_week_orders(portfolio['symbols'])
@@ -109,7 +111,7 @@ def backtest_strategy_mine(option_wizard: OptionWizard, start_month_date: date, 
         if position['status']=='OPEN':
             open_position_count+=1
             open_positions+=f""" 
-            {position['created_at'] | position['symbol']} | {position['strike']} | {position['pnl']} \n
+            { position['created_at']} | {position['symbol']} | {position['strike']} | {position['pnl']} \n
             """  
             pnl+=position['pnl']
 

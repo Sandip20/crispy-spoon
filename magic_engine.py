@@ -42,6 +42,7 @@ class OptionWizard:
         self.process_data = ProcessData(self.nse_downloader, self.mongo)
         self.telegram = Telegram(
             os.environ['TG_API_TOKEN'], os.environ['TG_CHAT_ID'])
+        print('connected to DB')
       
         self.last_accessed_date_fut = self.get_last_accessed('fut')
         self.last_accessed_date_opt = self.get_last_accessed('opt')
@@ -198,15 +199,14 @@ class OptionWizard:
                 created_at, NO_OF_WORKING_DAYS_END_CALCULATION, self.holidays)
             
             one_day_before = pd.to_datetime(date.today())-timedelta(days=1)
-            if end > one_day_before:
-                end = one_day_before
+            query_date= one_day_before if end > one_day_before else end
             """
             Get all the records between create_date and max_close_date  records sorted in ascending order of the date
             look for  the date on which Pnl <= -80000 that position status will be closed  that day will be the closing_date of the position
             """
             # Find data matching specified criteria
             data = self.mongo.find_many(
-                {'Symbol': symbol, 'Strike Price': strike, 'Date': {'$gte': created_at, '$lte': end}},
+                {'Symbol': symbol, 'Strike Price': strike, 'Date': {'$gte': created_at, '$lte': query_date}},
                 os.environ['OPTIONS_COLLECTION_NAME'],
                 sort=[('Date', 1)]
                 # ,
@@ -232,18 +232,10 @@ class OptionWizard:
                 pnl=round((current_price - price) * quantity,2)
                 # Get expiry date
                 expiry = filtered_data[0]['Expiry']
+                dte = (filtered_data[0]['Expiry'] - filtered_data[0]['Date']).days
+                exit_date = t_date
 
-                if pnl <= MAX_LOSS_PER_POSITION:
-                    # Calculate days to expiry (dte)
-                    dte = (filtered_data[0]['Expiry'] - filtered_data[0]['Date']).days
-                    # Set exit date
-                    exit_date = t_date
-                    position_status= 'CLOSED'
-                    break
-
-                if (expiry-t_date).days <=1 or (end-t_date).days == 0:
-                    dte = (filtered_data[0]['Expiry'] - filtered_data[0]['Date']).days
-                    exit_date = t_date
+                if pnl <= MAX_LOSS_PER_POSITION or (expiry-t_date).days <=1 or (end-t_date).days == 0:
                     position_status= 'CLOSED'
                     break
             # Calculate slippage and brokerages
