@@ -1,0 +1,21 @@
+name: Run Python Script in Docker
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # Run daily at midnight
+
+jobs:
+  run-script:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+      
+    - name: Set up Docker
+      uses: docker/setup-docker@v2
+      
+    - name: Build and run Docker container
+      run: |
+        docker build -t my-python-container .
+        docker run my-python-container
