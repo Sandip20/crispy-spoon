@@ -1,0 +1,38 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches: [ "develop" ]
+  pull_request:
+    branches: [ "develop" ]
+
+jobs:
+
+  build-and-run:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Build the Docker image
+      run: docker build . --file Dockerfile --tag my-image-name:$(date +%s)
+
+    - name: Run the Docker container
+      run: docker run -d --name my-container-name my-image-name:$(date +%s)
+      
+    - name: Check if script is running
+      run: |
+        if docker exec my-container-name ps aux | grep "your_script_name.py" | grep -v grep; then
+          echo "Your script is running"
+        else
+          echo "Your script is not running"
+        fi
+
+    - name: Check if Docker instance is running
+      run: |
+        if docker ps -a --filter "name=my-container-name" --format "{{.ID}}"; then
+          echo "Docker instance is running"
+        else
+          echo "Docker instance is not running"
+        fi
