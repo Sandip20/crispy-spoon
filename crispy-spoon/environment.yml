@@ -1,0 +1,10 @@
+name: crispy-spoon-env
+channels:
+  - defaults
+dependencies:
+  - python=3.8
+  - pandas
+  - pymongo
+  - numpy
+  - ratelimit
+  - pymongo[srv]
