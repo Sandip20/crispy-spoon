@@ -198,7 +198,7 @@ class FNODownloader:
                     )))
             
             if(request_count % REQUESTS_PER_SEC == 0):
-                await asyncio.sleep(5)
+                await asyncio.sleep(8)
             request_count += 2
         await asyncio.gather(*tasks)
         
@@ -219,7 +219,8 @@ class FNODownloader:
             end = min(end, one_day_before, order['expiry'])
 
             start_date = order['created_at']
-
+            if start_date>end:
+                continue
             # Query to filter options records
             query = {
                 'Symbol': order['symbol'],
@@ -254,6 +255,8 @@ class FNODownloader:
                     expiry_date=order['expiry'],
                     strike=order['strike']
                 )
+                if data.empty:
+                    continue
                 records = data_frame_to_dict(data)
                 self.mongo.insert_many(records, os.environ['OPTIONS_COLLECTION_NAME'])
     

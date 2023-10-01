@@ -4,7 +4,7 @@ import os
 import time
 from datetime import date,datetime
 import requests
-
+from nsepythonserver import *
 import pandas as pd
 
 
@@ -59,24 +59,28 @@ class NSE:
             'expiryDate': expiry_date.strftime('%d-%b-%Y')
         }
         if option_type in ['CE','PE']:
+            instrumentType='options'
             params.update({
                 'instrumentType': 'OPTSTK',
                 'strikePrice': strike_price,
                 'optionType': option_type
             })
         else:
+            instrumentType='futures'
             params.update({
                 'instrumentType': 'FUTSTK'
             })
         try:
-            if self.request_count % 100 == 0:
-                time.sleep(5) # delay for 5 seconds after every 100 requests
-            self.request_count += 1
-            response =  self.session.get(url, params=params, headers=self.headers)
-            data = response.json()
-            if not data['data']:
-                return pd.DataFrame()
-            df = pd.DataFrame(data['data'])
+          
+            # if self.request_count % 100 == 0:
+            #     time.sleep(5) # delay for 5 seconds after every 100 requests
+            # self.request_count += 1
+            # response =  self.session.get(url, params=params, headers=self.headers)
+            # data = response.json()
+            df= derivative_history(symbol,from_date.strftime("%d-%m-%Y"),to_date.strftime("%d-%m-%Y"),instrumentType,expiry_date.strftime('%d-%b-%Y'),int(float(strike_price)),option_type)
+            # if not data['data']:
+            #     return pd.DataFrame()
+            # df = pd.DataFrame(data['data'])
             if option_type in ['CE','PE']:
                 df_columns.extend(['FH_STRIKE_PRICE','FH_OPTION_TYPE'])
                 df = df[df_columns]
@@ -90,15 +94,15 @@ class NSE:
             return df
         except Exception as e:
             print("error:",e)
-            today = datetime.today().strftime('%Y-%m-%d')
-            if os.path.isfile(today + '.txt'):
-                # Open the file in "append" mode
-                file = open(today + '.txt', 'a')
-            else:
-                # Create the file in "write" mode
-                file = open(today + '.txt', 'w')
-            file.write(f'{response.url}\n')
-            file.close()
+            # today = date.today().strftime('%Y-%m-%d')
+            # if os.path.isfile(today + '.txt'):
+            #     # Open the file in "append" mode
+            #     file = open(today + '.txt', 'a')
+            # else:
+            #     # Create the file in "write" mode
+            #     file = open(today + '.txt', 'w')
+            # file.write(f'{response.url}\n')
+            # file.close()
             
     def get_nse_holidays(self):
        url='https://www.nseindia.com/api/holiday-master?type=trading'
@@ -109,7 +113,7 @@ class NSE:
        
        except Exception as e:
            print('error',e)
- 
+    
     def get_expiry_date(self,year,month):
             from_date=date(year,month,1).strftime('%d-%m-%Y')
             to_date=date.today().strftime('%d-%m-%Y')
@@ -128,8 +132,34 @@ class NSE:
             
             except Exception as e:
                 print('could not get Expiry',e)
-# nse = NSE()
-# df = nse.get_history(symbol='TATAMOTORS',from_date= '31-03-2023', to_date='15-04-2023', expiry_date='27-Apr-2023')
-# print(df)
-# df = nse.get_history(symbol='TCS',from_date= '31-03-2023', to_date='09-04-2023', expiry_date='27-Apr-2023',option_type='CE',strike_price="3240.00")
-# print(df)
+    def get_vix(self,from_date,to_date):
+        from_date=from_date.strftime('%d-%m-%Y')
+        to_date=to_date.strftime('%d-%m-%Y')
+        url=f'https://www.nseindia.com/api/historical/vixhistory?from={from_date}&to={to_date}'
+  
+        columns_mapper= {
+ 		"EOD_TIMESTAMP": 'Date',
+ 		"EOD_INDEX_NAME":"Index_Name",
+ 		"EOD_OPEN_INDEX_VAL": 'Open',
+ 		"EOD_CLOSE_INDEX_VAL":'Close',
+ 		"EOD_HIGH_INDEX_VAL":'High',
+ 		"EOD_LOW_INDEX_VAL":'Low',
+ 		"EOD_PREV_CLOSE": 'Prev_Close',
+ 		"VIX_PTS_CHG": 'Points_Change',
+ 		"VIX_PERC_CHG":'Percent_Change',
+        'TIMESTAMP':'TIMESTAMP'
+ 	}
+        try:
+            
+            response=self.session.get(url,headers=self.headers).json()
+            df=pd.DataFrame(response['data'],columns=columns_mapper).rename(columns=columns_mapper)
+
+            return df
+        
+        except Exception as e:
+            print('could not get Vix',e)
+
+    
+nse = NSE() 
+nse.get_history(symbol='SBIN',from_date= date(2023,8,1), to_date= date(2023,8,21),expiry_date=date(2023,8,31), option_type='CE',strike_price="570.00")
+
