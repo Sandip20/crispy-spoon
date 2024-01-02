@@ -168,7 +168,10 @@ class NSE:
             response.raise_for_status()
             json_data = response.json()
            
-            return datetime.strptime(json_data['years'][to_date.split('-')[2]][0], DATE_FORMAT_B).date()
+            return datetime.strptime(json_data['years'][
+                json_data['years']['all'][0]
+                # to_date.split('-')[2]
+                ][0], DATE_FORMAT_B).date()
             # for exp_date in json_data['years'][to_date.split('-')[2]]:
             #     if datetime.strptime(exp_date, DATE_FORMAT_B).date() >= datetime.strptime(from_date, DATE_FORMAT).date():
             #         date_string = exp_date
@@ -179,3 +182,36 @@ class NSE:
             print('Could not get expiry date from NSE website.')
             return ''
             # raise Exception('Could not get expiry date from NSE website.') from error
+    def get_vix(self,from_date,to_date):
+        from_date=from_date.strftime('%d-%m-%Y')
+        to_date=to_date.strftime('%d-%m-%Y')
+        url=f'https://www.nseindia.com/api/historical/vixhistory?from={from_date}&to={to_date}'
+
+        columns_mapper= {
+        "EOD_TIMESTAMP": 'Date',
+        "EOD_INDEX_NAME":"Index_Name",
+        "EOD_OPEN_INDEX_VAL": 'Open',
+        "EOD_CLOSE_INDEX_VAL":'Close',
+        "EOD_HIGH_INDEX_VAL":'High',
+        "EOD_LOW_INDEX_VAL":'Low',
+        "EOD_PREV_CLOSE": 'Prev_Close',
+        "VIX_PTS_CHG": 'Points_Change',
+        "VIX_PERC_CHG":'Percent_Change',
+        'TIMESTAMP':'TIMESTAMP'
+    }
+        try:
+            
+            response=self.session.get(url,headers=self.headers).json()
+            df=pd.DataFrame(response['data'],columns=columns_mapper).rename(columns=columns_mapper)
+
+            return df
+        
+        except Exception as e:
+            print('could not get Vix',e)
+    def download_vix_csv(self,path):
+        vix_dfs=[]
+        current_year=datetime.now().year
+        for year in range(2013,current_year+1):
+            vix_dfs.append(self.get_vix(from_date= date(year,1,1), to_date= date(year,12,31)))
+        df=pd.concat(vix_dfs,axis=0)
+        df.to_csv('india_vix.csv')

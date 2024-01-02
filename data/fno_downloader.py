@@ -11,7 +11,7 @@ from typing import List
 import pandas as pd
 from dateutil.relativedelta import relativedelta
 from data.constants import EXCEPTION_DATE, MONTHS_IN_YEAR, NO_OF_WORKING_DAYS_END_CALCULATION, REQUESTS_PER_SEC
-from data.util import add_working_days, data_frame_to_dict, get_last_business_day, get_strike, get_week
+from data.util import add_working_days, data_frame_to_dict, get_last_business_day, get_next_business_day, get_strike, get_week
 from data.mongodb import Mongo
 from data.nse_downloader import NSEDownloader
 
@@ -95,9 +95,11 @@ class FNODownloader:
                 return
             start = pd.to_datetime(last_accessed_date_fut).date()
             to_today = date.today()
-  
+        working_day=get_last_business_day(start, self.holidays)
         expiry_date = self.nse_downloader.get_expiry(
-            start.year, start.month, start.day)
+            working_day.year, working_day.month, working_day.day)
+  
+        # get_next_business_day(start,self.holidays)
         expiry_dates = [expiry_date]
 
         if to_today > expiry_date:
@@ -112,7 +114,14 @@ class FNODownloader:
                 start = expiry_dates[idx-1]
                 end_date = to_today
             else:
-                end_date = expiry_date if to_today > expiry_date else to_today
+                if start > expiry_date:
+                    continue
+                if to_today>expiry_date:
+                    end_date=expiry_date
+                else:
+                    end_date=to_today
+                
+               
 
             tasks = []
             request_count=0
@@ -198,7 +207,7 @@ class FNODownloader:
                     )))
             
             if(request_count % REQUESTS_PER_SEC == 0):
-                await asyncio.sleep(5)
+                await asyncio.sleep(8)
             request_count += 2
         await asyncio.gather(*tasks)
         
@@ -219,7 +228,8 @@ class FNODownloader:
             end = min(end, one_day_before, order['expiry'])
 
             start_date = order['created_at']
-
+            if start_date>end:
+                continue
             # Query to filter options records
             query = {
                 'Symbol': order['symbol'],
@@ -254,6 +264,8 @@ class FNODownloader:
                     expiry_date=order['expiry'],
                     strike=order['strike']
                 )
+                if data.empty:
+                    continue
                 records = data_frame_to_dict(data)
                 self.mongo.insert_many(records, os.environ['OPTIONS_COLLECTION_NAME'])
     

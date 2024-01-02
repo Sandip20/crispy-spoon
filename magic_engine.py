@@ -36,13 +36,13 @@ class OptionWizard:
         url = f"{base_url}:27017/?retryWrites=true&w=majority" if os.environ[
             'MONGO_INITDB_HOST'] == "localhost" else f"{base_url}/?retryWrites=true&w=majority"
         # connection with mongodb
+        print(url)
         self.mongo = Mongo(
             url=url, db_name=os.environ['MONGO_INITDB_DATABASE'], is_ca_required=True)
         self.nse_downloader = NSEDownloader()
         self.process_data = ProcessData(self.nse_downloader, self.mongo)
         self.telegram = Telegram(
             os.environ['TG_API_TOKEN'], os.environ['TG_CHAT_ID'])
-        print('connected to DB')
       
         self.last_accessed_date_fut = self.get_last_accessed('fut')
         self.last_accessed_date_opt = self.get_last_accessed('opt')
@@ -169,7 +169,7 @@ class OptionWizard:
         
         trade_date = self.get_trade_date(today)
         self.telegram.send_to_telegram(cheapest_records, trade_date)
-    def get_portfolio_pnl_v2(self, initial_capital:float,slippage:float,brokerage:float) -> dict:
+    def get_portfolio_pnl_v2(self, initial_capital: float, slippage: float, brokerage: float) -> dict:
         """
         Returns the profit and loss (PNL) of the portfolio and the total capital used in the portfolio.
         
@@ -179,74 +179,64 @@ class OptionWizard:
         Returns:
             portfolio_pnl (dict): A dictionary containing the portfolio's PNL, total capital, and symbol-wise PNL data.
         """
-
+        
         portfolio_pnl = {
             'pnl': 0,
             'total_capital': initial_capital,
             'used_capital': 0,
-            'symbols': {}
+            'symbols': {},
+            'dte': None,
+            'next_date': None
         }
 
         orders = self.mongo.find_many({}, os.environ['ORDERS_COLLECTION_NAME'])
-
+        next_dates=[]
         for order in orders:
             symbol = order['symbol']
             strike = order['strike']
             created_at = order['created_at']
             price = order['price']
 
-            end = add_working_days(
-                created_at, NO_OF_WORKING_DAYS_END_CALCULATION, self.holidays)
-            
-            one_day_before = pd.to_datetime(date.today())-timedelta(days=1)
-            query_date= one_day_before if end > one_day_before else end
-            """
-            Get all the records between create_date and max_close_date  records sorted in ascending order of the date
-            look for  the date on which Pnl <= -80000 that position status will be closed  that day will be the closing_date of the position
-            """
-            # Find data matching specified criteria
-            data = self.mongo.find_many(
-                {'Symbol': symbol, 'Strike Price': strike, 'Date': {'$gte': created_at, '$lte': query_date}},
-                os.environ['OPTIONS_COLLECTION_NAME'],
-                sort=[('Date', 1)]
-                # ,
-                # limit=2
-            )
+            one_day_before = pd.to_datetime(date.today()) - timedelta(days=1)
+            end = add_working_days(created_at, NO_OF_WORKING_DAYS_END_CALCULATION, self.holidays)
+            query_date = min(end, one_day_before)
 
-            # Get unique dates in ascending order
+            data = self.mongo.find_many({
+                'Symbol': symbol,
+                'Strike Price': strike,
+                'Date': {'$gte': created_at, '$lte': query_date}
+            }, os.environ['OPTIONS_COLLECTION_NAME'], sort=[('Date', 1)])
+
+            if len(data) == 0:
+                continue
+
             unique_dates = sorted(set(item['Date'] for item in data))
+            position_status = 'OPEN'
+            exit_date = None
 
-            position_status='OPEN'
-            # Iterate over unique dates
             for t_date in unique_dates:
-                # Filter data for the current date
                 filtered_data = [item for item in data if item['Date'] == t_date]
-                if(len(filtered_data)<2):
+                if len(filtered_data) < 2:
                     continue
-                
-                # Calculate current price
-                current_price = float(filtered_data[0]['Close']) + float(filtered_data[1]['Close'])
-                
-                # Get quantity
+                # current_price = float(filtered_data[0]['Close']) + float(filtered_data[1]['Close'])
+                current_price = sum(float(item['Close']) for item in filtered_data[:2])
                 quantity = filtered_data[0]['Lot_Size']
-                pnl=round((current_price - price) * quantity,2)
-                # Get expiry date
+                pnl = round((current_price - price) * quantity, 2)
                 expiry = filtered_data[0]['Expiry']
-                dte = (filtered_data[0]['Expiry'] - filtered_data[0]['Date']).days
+                dte = (expiry - t_date).days
                 exit_date = t_date
 
-                if pnl <= MAX_LOSS_PER_POSITION or (expiry-t_date).days <=1 or (end-t_date).days == 0:
-                    position_status= 'CLOSED'
+                if pnl <= MAX_LOSS_PER_POSITION or dte <= 1 or end == t_date:
+                    position_status = 'CLOSED'
                     break
-            # Calculate slippage and brokerages
-            slippage_cost=slippage*quantity
-            brokerage_cost=brokerage
 
+            slippage_cost = slippage * quantity
+            brokerage_cost = brokerage
 
-            # Calculate PNL considering slippage and brokerages
-            pnl -= (slippage_cost+ brokerage_cost)
+            pnl -= (slippage_cost + brokerage_cost)
+
             symbol_data = {
-                'symbol':symbol,
+                'symbol': symbol,
                 'quantity': quantity,
                 'strike': strike,
                 'created_at': created_at,
@@ -254,20 +244,25 @@ class OptionWizard:
                 'current_price': current_price,
                 'capital': round(price * quantity, 2),
                 'pnl': round(pnl, 2),
-                'expiry':expiry,
-                'exit_date':exit_date,
-                'dte':dte,
-                'status':position_status
+                'expiry': expiry,
+                'exit_date': exit_date,
+                'dte': dte,
+                'status': position_status
             }
 
             portfolio_pnl['symbols'][symbol] = symbol_data
-            portfolio_pnl['dte']= dte
+            portfolio_pnl['dte'] = max(portfolio_pnl['dte'], dte) if portfolio_pnl['dte'] else dte
             portfolio_pnl['pnl'] += symbol_data['pnl']
             portfolio_pnl['used_capital'] += symbol_data['capital']
-            portfolio_pnl['total_capital'] -= portfolio_pnl['used_capital']
+            portfolio_pnl['total_capital'] -= symbol_data['capital']
+
+            if not portfolio_pnl['next_date'] or exit_date < portfolio_pnl['next_date']:
+                next_dates.append(exit_date)
+
+        # portfolio_pnl['next_date'] = max(next_dates)  if len(next_dates) else None
 
         return portfolio_pnl
-    
+
     
     def get_portfolio_pnl(self, initial_capital:float,slippage:float,brokerage:float) -> dict:
         """
@@ -388,7 +383,8 @@ class OptionWizard:
         self.process_data.add_ce_pe_of_same_date(
             start_date=start_date, end_date=start_date)
         print('data processing')
-        self.process_data.update_week_min_coverage()
+
+        # self.process_data.update_week_min_coverage(update_last_two_months=True)
         self.process_data.update_current_vs_prev_two_months(
             today=True).to_csv('current.csv')
         print('CSV generated')

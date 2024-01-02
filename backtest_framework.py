@@ -32,9 +32,10 @@ def backtest_strategy_mine(option_wizard: OptionWizard, start_month_date: date, 
     total_returns = 0
     sharpe_ratio = 0
 
+    option_wizard.order_manager.clear_all()
     while (end_month_date - current_date).days > 0:
         # Find the cheapest options for the current date
-        record = option_wizard.find_cheapest_options(n=NO_OF_TRADES, input_date=current_date, back_test=True)
+        record = option_wizard.find_cheapest_options(n=NO_OF_TRADES, input_date=current_date,back_test=True,)
 
         # Filter out options that have already expired
         record['cheapest_options'] = [
@@ -60,8 +61,7 @@ def backtest_strategy_mine(option_wizard: OptionWizard, start_month_date: date, 
         # Get portfolio P&L and calculate returns
         portfolio = option_wizard.get_portfolio_pnl_v2(total_capital, slippage=slippage, brokerage=brokerage)
         current_date += timedelta(days=CLOSE_POSITION_AFTER)
-        # current_date=add_working_days(pd.to_datetime(trade_date), NO_OF_WORKING_DAYS_END_CALCULATION, option_wizard.holidays).date()
-     
+    
         
         # Close week orders
         option_wizard.order_manager.close_week_orders(portfolio['symbols'])
@@ -83,7 +83,6 @@ def backtest_strategy_mine(option_wizard: OptionWizard, start_month_date: date, 
             pnl_history.append(0)
 
     
-     
     if total_trades==0:
         return
     total_losses = total_trades - total_wins
@@ -120,17 +119,11 @@ def backtest_strategy_mine(option_wizard: OptionWizard, start_month_date: date, 
         """
     option_wizard.telegram.telegram_bot(
         f""" ------------ Open Positions: {open_position_count}------------------ \n
-{open_positions if open_position_count > 0 else " "}
+        {open_positions if open_position_count > 0 else " "}
         ------------------------------------------------- \n
         Total Trades: {total_trades}\n Total Wins:{total_wins}\n Total Losses:{total_losses}\n Total Returns:{total_returns}\n Win Rate:{win_rate}\n Sharpe Ratio:{sharpe_ratio}\n """)
-    # Plotting the backtest results
-    # plt.plot(trade_dates, pnl_history)
-    # plt.xlabel('Trade Date')
-    # plt.ylabel('Profit/Loss')
-    # plt.title('Backtest Results')
-    # plt.show()
 
 
 def backtest_me(option_wizard: OptionWizard, start_month_date, end_month_date):
-    initial_capital = 1000000
+    initial_capital = 300000
     backtest_strategy_mine(option_wizard, start_month_date, end_month_date,initial_capital)

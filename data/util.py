@@ -181,8 +181,15 @@ def update_record(record: dict, columns: list, date_of_trade: datetime) -> Inser
 
     # Add created_at and price keys
     record['created_at'] = date_of_trade
-    record['price'] = record[columns[2]]
-    
+
+    actual_straddle_premium = record[columns[2]]
+    # five_percent=actual_straddle_premium*0.05
+    # lower_limit=actual_straddle_premium-five_percent
+    # upper_limit=actual_straddle_premium+five_percent
+  
+    # record['price'] = random.uniform(lower_limit,upper_limit)
+    record['price']=actual_straddle_premium
+    # print(actual_straddle_premium,record['price'])
     return InsertOne(record)
 # # Example usage
 # start_date = datetime.date(2023, 5, 9)

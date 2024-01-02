@@ -66,6 +66,15 @@ class OrderManager:
 
         print(date_of_trade)
 
+    def clear_all(self):
+
+        """
+
+        clears all the trades  with given trade_date
+        """
+        self.mongo.delete_many({},os.environ['ORDERS_COLLECTION_NAME'])
+        self.mongo.delete_many({},os.environ['CLOSED_POSITIONS_COLLECTION_NAME'])
+    
     def clear_existing_trades(self,trade_date):
         """
 
@@ -81,6 +90,8 @@ class OrderManager:
         Returns:
             None
         """
+        if len(orders_dict.values())==0:
+            return
         positions=[]
         for order in  orders_dict.values():
             position = {

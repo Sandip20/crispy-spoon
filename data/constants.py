@@ -2,12 +2,13 @@
 In this module  we have all the constants required for the current project
 """
 MONTHS_IN_YEAR = 12
-REQUESTS_PER_SEC=50
+REQUESTS_PER_SEC=20
 DATE_FORMAT = '%d-%m-%Y'  # it will give you date in the format 01-03-2023 DD-MM-YYYY
 # it will give you date in the format 01-MAR-2023 DD-MMM-YYYY
 DATE_FORMAT_B = '%d-%b-%Y'
 NSE_HOST = 'https://www.nseindia.com'
-EXCLUDE_SYMBOLS=['HDFC'] #Excluding  due to merger of HDFC and HDFC bank happened so contracts got expired on 12th july
+EXCLUDE_SYMBOLS=['HDFC']
+# ['HDFC','ADANIENT'] #Excluding  exclude for july expiry due to merger of HDFC and HDFC bank happened so contracts got expired on 12th july
 #ADANIENT
 EXCLUSIONS = ["Saturday", "Sunday"]
 EXCEPTION_DATE='29-JUNE-2023'# The expiry date for NSE and BSE contracts was shifted from June 29th to June 28th. Only the day on which the expiry occurred was changed; the expiry date of contract remained the same.
