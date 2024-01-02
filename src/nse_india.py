@@ -168,7 +168,10 @@ class NSE:
             response.raise_for_status()
             json_data = response.json()
            
-            return datetime.strptime(json_data['years'][to_date.split('-')[2]][0], DATE_FORMAT_B).date()
+            return datetime.strptime(json_data['years'][
+                json_data['years']['all'][0]
+                # to_date.split('-')[2]
+                ][0], DATE_FORMAT_B).date()
             # for exp_date in json_data['years'][to_date.split('-')[2]]:
             #     if datetime.strptime(exp_date, DATE_FORMAT_B).date() >= datetime.strptime(from_date, DATE_FORMAT).date():
             #         date_string = exp_date

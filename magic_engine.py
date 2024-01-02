@@ -190,7 +190,7 @@ class OptionWizard:
         }
 
         orders = self.mongo.find_many({}, os.environ['ORDERS_COLLECTION_NAME'])
-
+        next_dates=[]
         for order in orders:
             symbol = order['symbol']
             strike = order['strike']
@@ -218,7 +218,8 @@ class OptionWizard:
                 filtered_data = [item for item in data if item['Date'] == t_date]
                 if len(filtered_data) < 2:
                     continue
-                current_price = float(filtered_data[0]['Close']) + float(filtered_data[1]['Close'])
+                # current_price = float(filtered_data[0]['Close']) + float(filtered_data[1]['Close'])
+                current_price = sum(float(item['Close']) for item in filtered_data[:2])
                 quantity = filtered_data[0]['Lot_Size']
                 pnl = round((current_price - price) * quantity, 2)
                 expiry = filtered_data[0]['Expiry']
@@ -256,7 +257,9 @@ class OptionWizard:
             portfolio_pnl['total_capital'] -= symbol_data['capital']
 
             if not portfolio_pnl['next_date'] or exit_date < portfolio_pnl['next_date']:
-                portfolio_pnl['next_date'] = exit_date
+                next_dates.append(exit_date)
+
+        # portfolio_pnl['next_date'] = max(next_dates)  if len(next_dates) else None
 
         return portfolio_pnl
 
@@ -380,7 +383,8 @@ class OptionWizard:
         self.process_data.add_ce_pe_of_same_date(
             start_date=start_date, end_date=start_date)
         print('data processing')
-        self.process_data.update_week_min_coverage()
+
+        # self.process_data.update_week_min_coverage(update_last_two_months=True)
         self.process_data.update_current_vs_prev_two_months(
             today=True).to_csv('current.csv')
         print('CSV generated')

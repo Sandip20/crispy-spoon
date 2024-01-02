@@ -61,11 +61,6 @@ def backtest_strategy_mine(option_wizard: OptionWizard, start_month_date: date, 
         # Get portfolio P&L and calculate returns
         portfolio = option_wizard.get_portfolio_pnl_v2(total_capital, slippage=slippage, brokerage=brokerage)
         current_date += timedelta(days=CLOSE_POSITION_AFTER)
-        # if portfolio['next_date'] is not None:
-        #  current_date=(portfolio['next_date'].date())+timedelta(days=1)
-        # else:
-        #     current_date += timedelta(days=CLOSE_POSITION_AFTER)
-        # current_date=add_working_days(pd.to_datetime(trade_date), NO_OF_WORKING_DAYS_END_CALCULATION, option_wizard.holidays).date()
     
         
         # Close week orders
